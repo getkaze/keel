@@ -1,0 +1,218 @@
+{{define "config-editor"}}
+<div class="flex flex-col" style="height:calc(100vh - 5rem)"
+     x-data="configEditor()"
+     x-init="load()">
+
+    <!-- Toolbar -->
+    <div class="config-toolbar flex-wrap">
+        <h2>services.json</h2>
+
+        <!-- Validate -->
+        <button class="ghost sm" @click="validate()" :disabled="saving" style="margin:0">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            VALIDATE
+        </button>
+
+        <!-- Revert -->
+        <button class="ghost sm" @click="revert()" :disabled="saving" style="margin:0">
+            <svg class="icon-sm"><use href="/static/lucide-sprite.svg#refresh-cw"></use></svg>
+            REVERT
+        </button>
+
+        <!-- Save -->
+        <button class="sm" @click="save()" :disabled="saving || !dirty" style="margin:0">
+            <svg class="icon-sm"><use href="/static/lucide-sprite.svg#save"></use></svg>
+            SAVE
+        </button>
+
+        <!-- Apply -->
+        <button class="secondary sm" @click="apply()" :disabled="saving || dirty" style="margin:0"
+                title="Save first, then apply to update all services">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+            APPLY
+        </button>
+    </div>
+
+    <!-- Validation message -->
+    <div x-show="message" x-transition class="mt-2">
+        <div class="alert" :class="messageType === 'error' ? 'alert-error' : 'alert-success'">
+            <span x-text="message" class="text-sm"></span>
+        </div>
+    </div>
+
+    <!-- Editor textarea -->
+    <textarea x-ref="editor"
+              class="config-editor-textarea"
+              x-model="content"
+              @input="dirty = true; message = ''"
+              spellcheck="false"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"></textarea>
+
+    <!-- Footer info -->
+    <div class="config-status-bar">
+        <span x-text="dirty ? 'Unsaved changes' : 'No changes'"></span>
+        <span x-text="content ? content.split('\\n').length + ' lines' : ''"></span>
+    </div>
+</div>
+
+<script>
+function configEditor() {
+    return {
+        content: '',
+        original: '',
+        dirty: false,
+        saving: false,
+        message: '',
+        messageType: 'success',
+
+        async load() {
+            try {
+                var resp = await fetch('/api/config');
+                if (!resp.ok) throw new Error('Failed to load config');
+                var text = await resp.text();
+                try {
+                    this.content = JSON.stringify(JSON.parse(text), null, 2);
+                } catch(e) {
+                    this.content = text;
+                }
+                this.original = this.content;
+                this.dirty = false;
+                this.message = '';
+            } catch(e) {
+                this.message = e.message;
+                this.messageType = 'error';
+            }
+        },
+
+        async validate() {
+            this.message = '';
+            try {
+                var resp = await fetch('/api/config/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: this.content
+                });
+                var data = await resp.json();
+                if (resp.ok) {
+                    this.message = 'Valid JSON';
+                    this.messageType = 'success';
+                } else {
+                    this.message = data.error || 'Validation failed';
+                    this.messageType = 'error';
+                }
+            } catch(e) {
+                this.message = e.message;
+                this.messageType = 'error';
+            }
+        },
+
+        async save() {
+            this.saving = true;
+            this.message = '';
+            try {
+                var resp = await fetch('/api/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: this.content
+                });
+                var data = await resp.json();
+                if (resp.ok) {
+                    this.original = this.content;
+                    this.dirty = false;
+                    this.message = 'Saved successfully';
+                    this.messageType = 'success';
+                    showToast('Config saved', 'success');
+                } else {
+                    this.message = data.error || 'Save failed';
+                    this.messageType = 'error';
+                    showToast('Save failed: ' + (data.error || 'unknown error'), 'error');
+                }
+            } catch(e) {
+                this.message = e.message;
+                this.messageType = 'error';
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async revert() {
+            try {
+                var resp = await fetch('/api/config/revert', { method: 'POST' });
+                if (!resp.ok) {
+                    var data = await resp.json();
+                    showToast(data.error || 'Revert failed', 'error');
+                    return;
+                }
+                var text = await resp.text();
+                try {
+                    this.content = JSON.stringify(JSON.parse(text), null, 2);
+                } catch(e) {
+                    this.content = text;
+                }
+                this.original = this.content;
+                this.dirty = false;
+                this.message = '';
+                showToast('Reverted to previous version', 'info');
+            } catch(e) {
+                showToast('Revert failed: ' + e.message, 'error');
+            }
+        },
+
+        apply() {
+            var panel = document.getElementById('operation-output');
+            if (panel) {
+                panel.innerHTML = '';
+                document.getElementById('operation-panel').classList.remove('hidden');
+            }
+            window.dispatchEvent(new CustomEvent('operation-start'));
+
+            fetch('/api/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ all: true })
+            }).then(resp => {
+                if (!resp.ok && resp.status === 409) {
+                    showToast('An operation is already in progress', 'warning');
+                    return;
+                }
+                var reader = resp.body.getReader();
+                var decoder = new TextDecoder();
+                var converter = getAnsiUp();
+                var buffer = '';
+
+                function read() {
+                    reader.read().then(function(result) {
+                        if (result.done) return;
+                        buffer += decoder.decode(result.value, { stream: true });
+                        var lines = buffer.split('\n');
+                        buffer = lines.pop();
+                        lines.forEach(function(line) {
+                            if (line.startsWith('data: ')) {
+                                var text = line.slice(6);
+                                if (panel) {
+                                    var div = document.createElement('div');
+                                    div.innerHTML = safeAnsiHtml(converter, text);
+                                    panel.appendChild(div);
+                                    panel.scrollTop = panel.scrollHeight;
+                                }
+                            } else if (line.startsWith('event: done')) {
+                                showToast('Update completed', 'success');
+                                htmx.trigger(document.body, 'refreshServices');
+                            } else if (line.startsWith('event: error')) {
+                                showToast('Update failed', 'error');
+                            }
+                        });
+                        read();
+                    });
+                }
+                read();
+            }).catch(function(e) {
+                showToast('Apply failed: ' + e.message, 'error');
+            });
+        }
+    };
+}
+</script>
+{{end}}

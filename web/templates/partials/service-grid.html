@@ -1,0 +1,53 @@
+{{define "service-grid"}}
+<div id="services-grid"
+     hx-get="/partials/overview" hx-trigger="refreshServices from:body" hx-swap="outerHTML">
+    {{if .Services}}
+    <div class="flex items-center justify-between" style="margin-bottom:var(--space-3)">
+        <h2 style="margin:0">OVERVIEW</h2>
+        <div class="flex items-center gap-2">
+            {{if .HasStopped}}
+            <button class="sm"
+                    onclick="this.disabled=true;this.querySelector('span').textContent='STARTING...';startSSE('/api/services/start-all',{successMessage:'All services started'});"
+                    style="display:inline-flex;align-items:center;gap:0.375rem">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
+                <span>START ALL</span>
+            </button>
+            {{end}}
+            {{if .HasRunning}}
+            <button class="ghost sm"
+                    onclick="if(!confirm('Stop all running containers?'))return;this.disabled=true;this.querySelector('span').textContent='STOPPING...';startSSE('/api/services/stop-all',{successMessage:'All services stopped'});"
+                    style="display:inline-flex;align-items:center;gap:0.375rem">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#square"></use></svg>
+                <span>STOP ALL</span>
+            </button>
+            {{end}}
+        </div>
+    </div>
+    <div class="service-groups">
+        {{range .Groups}}
+        <div class="service-group">
+            <div class="service-group-header">
+                <span class="service-group-label">{{.Name}}</span>
+                <span class="service-group-count">{{len .Services}}</span>
+            </div>
+            <div class="grid-cards">
+                {{range .Services}}
+                {{template "service-card" .}}
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state">
+        <svg class="empty-state-icon" viewBox="0 0 24 24"><use href="/static/lucide-sprite.svg#box"></use></svg>
+        <span class="empty-state-title">No containers yet</span>
+        <span class="empty-state-hint">
+            Click <a href="/services/new"
+                     hx-get="/partials/service-new" hx-target="#main-content" hx-push-url="/services/new"
+                     style="color:var(--color-primary)">+ NEW CONTAINER</a> to get started
+        </span>
+    </div>
+    {{end}}
+</div>
+{{end}}

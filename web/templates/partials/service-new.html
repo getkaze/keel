@@ -1,0 +1,144 @@
+{{define "service-new"}}
+<div class="space-y-4" style="max-width:680px">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <a href="/"
+           hx-get="/partials/overview" hx-target="#main-content" hx-push-url="/"
+           class="ghost sm">
+            <svg class="icon-sm"><use href="/static/lucide-sprite.svg#chevron-left"></use></svg>
+            BACK
+        </a>
+        <h1 class="detail-service-name">NEW CONTAINER</h1>
+    </div>
+
+    <!-- Form -->
+    <form id="new-container-form" class="detail-info-card space-y-4"
+          hx-post="/api/services"
+          hx-swap="none"
+          hx-on::after-request="handleCreateResponse(event)">
+
+        <!-- Name + Image + Registry -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div>
+                <label class="field-label">NAME <span style="color:var(--color-danger)">*</span></label>
+                <input type="text" name="name" class="field-input font-mono" placeholder="my-service" required
+                       oninput="autoHostname(this.value)">
+                <div class="field-hint">Lowercase, hyphens only</div>
+            </div>
+            <div>
+                <label class="field-label">IMAGE <span style="color:var(--color-danger)">*</span></label>
+                <input type="text" name="image" class="field-input font-mono" placeholder="nginx:latest" required>
+            </div>
+        </div>
+
+        <!-- Registry + Group -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div>
+                <label class="field-label">REGISTRY</label>
+                <select name="registry" class="field-input font-mono">
+                    <option value="">Docker Hub (default)</option>
+                    <option value="ghcr">GHCR (ghcr.io)</option>
+                </select>
+                <div class="field-hint">GHCR requires credentials in state/ghcr-user + ghcr-pat</div>
+            </div>
+            <div>
+                <label class="field-label">GROUP</label>
+                <input type="text" name="group" class="field-input font-mono" placeholder="database">
+                <div class="field-hint">Groups services in the dashboard</div>
+            </div>
+        </div>
+
+        <!-- Hostname + Network -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div>
+                <label class="field-label">HOSTNAME</label>
+                <input type="text" id="field-hostname" name="hostname" class="field-input font-mono"
+                       placeholder="keel-my-service">
+                <div class="field-hint">Auto-filled from name</div>
+            </div>
+            <div>
+                <label class="field-label">NETWORK</label>
+                <input type="text" name="network" class="field-input font-mono"
+                       value="{{.DefaultNetwork}}" placeholder="keel-net">
+            </div>
+        </div>
+
+        <!-- Ports -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div>
+                <label class="field-label">EXTERNAL PORT</label>
+                <input type="number" name="port_external" class="field-input font-mono" placeholder="8080" min="1" max="65535">
+            </div>
+            <div>
+                <label class="field-label">INTERNAL PORT</label>
+                <input type="number" name="port_internal" class="field-input font-mono" placeholder="80" min="1" max="65535">
+            </div>
+        </div>
+
+        <!-- Environment Variables -->
+        <div>
+            <label class="field-label">ENVIRONMENT VARIABLES</label>
+            <textarea name="environment" class="field-input font-mono"
+                      style="font-size:var(--text-xs);min-height:100px;resize:vertical"
+                      placeholder="KEY=value&#10;ANOTHER_KEY=another_value&#10;# lines starting with # are ignored"
+                      spellcheck="false"></textarea>
+            <div class="field-hint">One KEY=VALUE per line</div>
+        </div>
+
+        <!-- Volumes -->
+        <div>
+            <label class="field-label">VOLUMES</label>
+            <textarea name="volumes" class="field-input font-mono"
+                      style="font-size:var(--text-xs);min-height:60px;resize:vertical"
+                      placeholder="my-volume:/data&#10;/host/path:/container/path"
+                      spellcheck="false"></textarea>
+            <div class="field-hint">One volume per line (volume:path or host:path)</div>
+        </div>
+
+        <!-- Command -->
+        <div>
+            <label class="field-label">COMMAND <span style="opacity:0.5">(optional)</span></label>
+            <input type="text" name="command" class="field-input font-mono"
+                   placeholder="--flag value">
+            <div class="field-hint">Overrides the image default CMD</div>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex justify-end gap-2" style="padding-top:0.5rem;border-top:1px solid var(--color-border)">
+            <a href="/"
+               hx-get="/partials/overview" hx-target="#main-content" hx-push-url="/"
+               class="ghost sm">CANCEL</a>
+            <button type="submit" class="sm">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#plus"></use></svg>
+                CREATE CONTAINER
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function autoHostname(name) {
+    var h = document.getElementById('field-hostname');
+    if(h && (h.value === '' || h.dataset.auto === 'true')) {
+        h.value = name ? 'keel-' + name.toLowerCase().replace(/[^a-z0-9-]/g,'-') : '';
+        h.dataset.auto = 'true';
+    }
+}
+document.getElementById('field-hostname').addEventListener('input', function(){
+    this.dataset.auto = 'false';
+});
+
+function handleCreateResponse(evt) {
+    var xhr = evt.detail.xhr;
+    if(xhr.status >= 400) {
+        showToast('Error: ' + xhr.responseText, 'error');
+        return;
+    }
+    // After SSE stream, redirect to overview
+    htmx.ajax('GET', '/partials/overview', {target:'#main-content', swap:'innerHTML'});
+    history.pushState(null, '', '/');
+}
+</script>
+
+{{end}}

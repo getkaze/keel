@@ -1,0 +1,244 @@
+{{define "log-viewer"}}
+<div class="flex flex-col" style="height:calc(100vh - 5rem)"
+     x-data="logViewer()"
+     x-init="init()"
+     @keydown.escape.window="if (streaming) disconnect()">
+
+    <!-- Toolbar -->
+    <div class="log-toolbar flex-wrap">
+        <!-- Selectors group -->
+        <div class="log-toolbar-selectors">
+            <select x-model="selectedService" @change="onServiceChange()" style="width:12rem;margin:0">
+                <option value="">Select service...</option>
+                {{range .Services}}
+                <option value="{{.Name}}">{{.Name}}</option>
+                {{end}}
+            </select>
+
+            <select x-model="selectedSource" x-show="sources.length > 1" @change="onSourceChange()" style="width:10rem;margin:0">
+                <template x-for="src in sources" :key="src.name">
+                    <option :value="src.name" x-text="src.name"></option>
+                </template>
+            </select>
+
+            <select x-model="selectedFile" x-show="files.length > 0" @change="reconnect()" style="width:14rem;margin:0">
+                <option value="">Select file...</option>
+                <template x-for="f in files" :key="f.path">
+                    <option :value="f.path" x-text="f.name"></option>
+                </template>
+            </select>
+
+            <label class="flex items-center gap-1 text-xs text-muted" style="margin:0">
+                Lines:
+                <input type="number" x-model.number="lines" min="1" max="10000" value="100"
+                       style="width:5rem;margin:0;padding:0.25rem 0.5rem;font-size:0.75rem">
+            </label>
+
+            <label class="flex items-center gap-2 text-xs" style="margin:0">
+                <span>Follow</span>
+                <input type="checkbox" role="switch" x-model="follow" checked>
+            </label>
+        </div>
+
+        <!-- Actions group -->
+        <div class="log-toolbar-actions">
+            <button class="sm" x-show="!streaming && canConnect" @click="connect()" style="margin:0">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
+                STREAM
+            </button>
+            <button class="outline-error sm" x-show="streaming" @click="disconnect()" style="margin:0">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#square"></use></svg>
+                STOP
+            </button>
+            <button class="ghost sm" @click="clearOutput()" style="margin:0">CLEAR</button>
+
+            <div class="log-status">
+                <span class="dot animate-pulse" :class="streaming ? 'dot-success' : 'dot-ghost'"
+                      style="width:0.5rem;height:0.5rem"></span>
+                <span x-text="streaming ? '[STREAMING]' : '[IDLE]'"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log output area -->
+    <div x-ref="logOutput" class="log-output" @scroll="onScroll()">
+        <template x-if="!selectedService">
+            <div class="empty-state" style="height:100%">
+                <svg class="empty-state-icon" viewBox="0 0 24 24"><use href="/static/lucide-sprite.svg#file-text"></use></svg>
+                <span class="empty-state-title">No service selected</span>
+                <span class="empty-state-hint">Choose a service above to stream its logs</span>
+            </div>
+        </template>
+    </div>
+
+    <!-- Scroll-to-bottom button -->
+    <button class="scroll-btn"
+            x-show="!follow && lineCount > 0"
+            x-transition
+            @click="scrollToBottom()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+</div>
+
+<script>
+function logViewer() {
+    return {
+        selectedService: '',
+        selectedSource: 'container',
+        selectedFile: '',
+        sources: [],
+        files: [],
+        lines: 100,
+        follow: true,
+        streaming: false,
+        lineCount: 0,
+        eventSource: null,
+        ansi: null,
+        loading: false,
+
+        get canConnect() {
+            if (!this.selectedService) return false;
+            // If current source has files (directory), need a file selected
+            var src = this.sources.find(s => s.name === this.selectedSource);
+            if (src && src.files && src.files.length > 0 && !this.selectedFile) return false;
+            return true;
+        },
+
+        init() {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('service')) {
+                this.selectedService = params.get('service');
+                this.$nextTick(() => this.onServiceChange());
+            }
+
+            document.addEventListener('open-logs', (e) => {
+                this.selectedService = e.detail.service;
+                this.$nextTick(() => this.onServiceChange());
+            });
+        },
+
+        async onServiceChange() {
+            this.disconnect();
+            this.sources = [];
+            this.files = [];
+            this.selectedSource = 'container';
+            this.selectedFile = '';
+
+            if (!this.selectedService) return;
+
+            this.loading = true;
+            try {
+                var resp = await fetch('/api/logs/' + encodeURIComponent(this.selectedService) + '/sources');
+                if (resp.ok) {
+                    this.sources = await resp.json();
+                    this.selectedSource = this.sources.length > 0 ? this.sources[0].name : 'container';
+                    this.onSourceChange();
+                }
+            } catch (e) {
+                console.error('Failed to load log sources:', e);
+            }
+            this.loading = false;
+
+            this.$nextTick(() => this.connect());
+        },
+
+        onSourceChange() {
+            this.selectedFile = '';
+            var src = this.sources.find(s => s.name === this.selectedSource);
+            if (src && src.files && src.files.length > 0) {
+                this.files = src.files;
+            } else {
+                this.files = [];
+            }
+            if (this.streaming) {
+                this.clearOutput();
+                this.connect();
+            }
+        },
+
+        connect() {
+            if (!this.selectedService) return;
+            this.disconnect();
+
+            var url = '/api/logs/' + encodeURIComponent(this.selectedService)
+                    + '?lines=' + this.lines;
+
+            if (this.selectedFile) {
+                // Include source so backend knows if it's a host-path source.
+                url += '&source=' + encodeURIComponent(this.selectedSource);
+                url += '&file=' + encodeURIComponent(this.selectedFile);
+            } else if (this.selectedSource && this.selectedSource !== 'container') {
+                url += '&source=' + encodeURIComponent(this.selectedSource);
+            }
+
+            this.eventSource = new EventSource(url);
+            this.streaming = true;
+
+            if (!this.ansi && typeof AnsiUp !== 'undefined') {
+                this.ansi = new AnsiUp();
+                this.ansi.use_classes = true;
+            }
+
+            var output = this.$refs.logOutput;
+
+            this.eventSource.onmessage = (e) => {
+                var line = document.createElement('div');
+                line.innerHTML = safeAnsiHtml(this.ansi, e.data);
+                output.appendChild(line);
+                this.lineCount++;
+                if (this.follow) {
+                    output.scrollTop = output.scrollHeight;
+                }
+            };
+
+            this.eventSource.addEventListener('error', (e) => {
+                this.streaming = false;
+                if (e.data) {
+                    var line = document.createElement('div');
+                    line.className = 'text-error font-semibold mt-1';
+                    line.textContent = e.data;
+                    output.appendChild(line);
+                }
+            });
+        },
+
+        disconnect() {
+            if (this.eventSource) {
+                this.eventSource.close();
+                this.eventSource = null;
+            }
+            this.streaming = false;
+        },
+
+        reconnect() {
+            if (this.streaming) {
+                this.clearOutput();
+                this.connect();
+            }
+        },
+
+        clearOutput() {
+            var output = this.$refs.logOutput;
+            var children = Array.from(output.children);
+            children.forEach(child => {
+                if (child.tagName !== 'TEMPLATE') child.remove();
+            });
+            this.lineCount = 0;
+        },
+
+        onScroll() {
+            var el = this.$refs.logOutput;
+            var atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+            if (!atBottom && this.follow) {
+                this.follow = false;
+            }
+        },
+
+        scrollToBottom() {
+            this.follow = true;
+            this.$refs.logOutput.scrollTop = this.$refs.logOutput.scrollHeight;
+        }
+    };
+}
+</script>
+{{end}}

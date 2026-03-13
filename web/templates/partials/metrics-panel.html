@@ -1,0 +1,102 @@
+{{define "metrics-panel"}}
+<div id="metrics-content" hx-get="/partials/metrics" hx-trigger="every 10s" hx-swap="outerHTML">
+
+    <!-- Host gauges -->
+    <div class="metrics-panel">
+        <!-- CPU -->
+        <article class="metrics-card">
+            <div class="metrics-card-header">
+                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                <strong class="metrics-card-label">CPU</strong>
+                <span class="metrics-card-value">{{printf "%.1f" .CPU.UsagePercent}}%</span>
+            </div>
+            <progress class="metrics-progress {{progressColor .CPU.UsagePercent}}"
+                      value="{{printf "%.0f" .CPU.UsagePercent}}" max="100"></progress>
+        </article>
+
+        <!-- Memory -->
+        <article class="metrics-card">
+            <div class="metrics-card-header">
+                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M6 19v-3m4 3v-6m4 6V9m4 10V5"/></svg>
+                <strong class="metrics-card-label">RAM</strong>
+                <span class="metrics-card-value">{{printf "%.1f" .Memory.UsagePercent}}%</span>
+            </div>
+            <progress class="metrics-progress {{progressColor .Memory.UsagePercent}}"
+                      value="{{printf "%.0f" .Memory.UsagePercent}}" max="100"></progress>
+            <div class="metrics-card-detail">
+                {{formatBytes .Memory.UsedBytes}} / {{formatBytes .Memory.TotalBytes}}
+            </div>
+        </article>
+
+        <!-- Disk -->
+        <article class="metrics-card">
+            <div class="metrics-card-header">
+                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg>
+                <strong class="metrics-card-label">DISK</strong>
+                <span class="metrics-card-value">{{printf "%.1f" .Disk.UsagePercent}}%</span>
+            </div>
+            <progress class="metrics-progress {{progressColor .Disk.UsagePercent}}"
+                      value="{{printf "%.0f" .Disk.UsagePercent}}" max="100"></progress>
+            <div class="metrics-card-detail">
+                {{formatBytes .Disk.UsedBytes}} / {{formatBytes .Disk.TotalBytes}}
+            </div>
+        </article>
+
+        <!-- Load Average -->
+        <article class="metrics-card">
+            <div class="metrics-card-header">
+                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <strong class="metrics-card-label">LOAD AVG</strong>
+            </div>
+            <div class="metrics-card-detail">
+                {{printf "%.2f" .LoadAvg.Load1}} · {{printf "%.2f" .LoadAvg.Load5}} · {{printf "%.2f" .LoadAvg.Load15}}
+            </div>
+        </article>
+
+        <!-- Uptime -->
+        <article class="metrics-card">
+            <div class="metrics-card-header">
+                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <strong class="metrics-card-label">UPTIME</strong>
+            </div>
+            <div class="metrics-card-detail">
+                {{formatUptime .Uptime.UptimeSeconds}}
+            </div>
+        </article>
+    </div>
+
+    <!-- Container resources -->
+    {{if .Containers}}
+    <div class="metrics-containers">
+        <h3 class="metrics-section-title">Container Resources</h3>
+        <div class="metrics-table-wrap">
+            <table class="metrics-table">
+                <thead>
+                    <tr>
+                        <th>CONTAINER</th>
+                        <th>CPU</th>
+                        <th>MEMORY</th>
+                        <th>MEM %</th>
+                        <th>NET I/O</th>
+                        <th>BLOCK I/O</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Containers}}
+                    <tr>
+                        <td>{{.Name}}</td>
+                        <td>{{.CPUPerc}}</td>
+                        <td>{{.MemUsage}}</td>
+                        <td>{{.MemPerc}}</td>
+                        <td>{{.NetIO}}</td>
+                        <td>{{.BlockIO}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {{end}}
+
+</div>
+{{end}}

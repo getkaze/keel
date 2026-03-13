@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keel</title>
+    <!-- Apply theme before render to prevent flash -->
+    <script>
+        document.documentElement.dataset.theme = localStorage.getItem('keel-theme') || 'dark';
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#8b5cf6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Keel">
+    <meta name="description" content="Docker container management dashboard">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/style.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/xterm.css">
+</head>
+<body x-data="{
+    sidebarOpen: true,
+    terminalOpen: false,
+    darkMode: localStorage.getItem('keel-theme') !== 'light',
+    toggleTheme() {
+        this.darkMode = !this.darkMode;
+        const t = this.darkMode ? 'dark' : 'light';
+        localStorage.setItem('keel-theme', t);
+        document.documentElement.dataset.theme = t;
+    }
+}" @toggle-terminal.document="terminalOpen = !terminalOpen"
+   @connect-container.document="terminalOpen = true">
+
+    <!-- Header -->
+    <header class="app-header"
+            :class="sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'"
+            style="justify-content:flex-end; -webkit-app-region: drag;">
+        <div class="flex items-center gap-3" style="-webkit-app-region: no-drag;">
+            <span id="target-info">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#monitor"></use></svg>
+                {{.TargetName}}
+            </span>
+            <div id="update-indicator" style="display:none">
+                <a href="#" onclick="showToast('Run: sudo keel update', 'info'); return false;"
+                   class="update-badge" title="New version available">
+                    <svg class="icon-sm"><use href="/static/lucide-sprite.svg#download"></use></svg>
+                    <span id="update-version"></span>
+                </a>
+            </div>
+            <div id="metrics-mini"
+                 hx-get="/partials/metrics-mini"
+                 hx-trigger="load, every 10s"
+                 hx-swap="innerHTML"></div>
+            <!-- Theme Toggle -->
+            <button class="theme-toggle-btn"
+                    @click="toggleTheme()"
+                    :aria-label="darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+                    :title="darkMode ? 'Light mode' : 'Dark mode'">
+                <!-- Moon (shown in dark mode) -->
+                <svg x-show="darkMode" class="icon-sm"><use href="/static/lucide-sprite.svg#moon"></use></svg>
+                <!-- Sun (shown in light mode) -->
+                <svg x-show="!darkMode" class="icon-sm"><use href="/static/lucide-sprite.svg#sun"></use></svg>
+            </button>
+            <!-- Terminal Toggle -->
+            <button class="terminal-toggle-btn"
+                    @click="terminalOpen = !terminalOpen"
+                    aria-label="Toggle terminal"
+                    :class="terminalOpen ? 'active' : ''">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#terminal"></use></svg>
+                <span>TERMINAL</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="app-sidebar"
+           :class="sidebarOpen ? 'expanded' : 'collapsed'">
+        <div class="sidebar-logo">
+            <svg class="sidebar-logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <!-- Keel logo — spine + crossbars -->
+                <line x1="12" y1="4"  x2="12" y2="20"/>
+                <line x1="3"  y1="12" x2="21" y2="12"/>
+                <line x1="6"  y1="7"  x2="18" y2="7"/>
+                <line x1="6"  y1="17" x2="18" y2="17"/>
+            </svg>
+            <span class="sidebar-logo-text" x-show="sidebarOpen">keel</span>
+        </div>
+
+        <nav class="sidebar-nav">
+            <ul class="nav-list">
+                <li>
+                    <a href="/"
+                       hx-get="/partials/overview" hx-target="#main-content" hx-push-url="/"
+                       data-page="/"
+                       class="nav-item{{if eq .Page "/"}} active{{end}}">
+                        <svg class="icon"><use href="/static/lucide-sprite.svg#layout-dashboard"></use></svg>
+                        <span x-show="sidebarOpen">OVERVIEW</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/logs"
+                       hx-get="/partials/logs" hx-target="#main-content" hx-push-url="/logs"
+                       data-page="/logs"
+                       class="nav-item{{if eq .Page "/logs"}} active{{end}}">
+                        <svg class="icon"><use href="/static/lucide-sprite.svg#file-text"></use></svg>
+                        <span x-show="sidebarOpen">LOGS</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/metrics"
+                       hx-get="/partials/metrics" hx-target="#main-content" hx-push-url="/metrics"
+                       data-page="/metrics"
+                       class="nav-item{{if eq .Page "/metrics"}} active{{end}}">
+                        <svg class="icon"><use href="/static/lucide-sprite.svg#activity"></use></svg>
+                        <span x-show="sidebarOpen">METRICS</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/seeders"
+                       hx-get="/partials/seeders" hx-target="#main-content" hx-push-url="/seeders"
+                       data-page="/seeders"
+                       class="nav-item{{if eq .Page "/seeders"}} active{{end}}">
+                        <svg class="icon"><use href="/static/lucide-sprite.svg#database"></use></svg>
+                        <span x-show="sidebarOpen">SEEDERS</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/settings"
+                       hx-get="/partials/settings" hx-target="#main-content" hx-push-url="/settings"
+                       data-page="/settings"
+                       class="nav-item{{if eq .Page "/settings"}} active{{end}}">
+                        <svg class="icon"><use href="/static/lucide-sprite.svg#settings"></use></svg>
+                        <span x-show="sidebarOpen">SETTINGS</span>
+                    </a>
+                </li>
+                <li style="margin-top:auto;padding-top:1rem">
+                    <a href="/services/new"
+                       hx-get="/partials/service-new" hx-target="#main-content" hx-push-url="/services/new"
+                       data-page="/services/new"
+                       class="nav-item{{if eq .Page "/services/new"}} active{{end}}"
+                       style="color:var(--color-primary)">
+                        <svg class="icon"><use href="/static/lucide-sprite.svg#plus"></use></svg>
+                        <span x-show="sidebarOpen">NEW CONTAINER</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <button class="sidebar-toggle" @click="sidebarOpen = !sidebarOpen" aria-label="Toggle sidebar">
+            <svg class="icon-sm"
+                 :style="sidebarOpen ? '' : 'transform:rotate(180deg)'">
+                <use href="/static/lucide-sprite.svg#chevron-left"></use>
+            </svg>
+        </button>
+    </aside>
+
+    <!-- Main content area -->
+    <main id="main-content" class="app-main"
+          :class="sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'">
+        {{block "content" .}}{{end}}
+    </main>
+
+    <!-- Operation progress panel -->
+    {{template "operation-progress" .}}
+
+    <!-- Terminal bottom panel -->
+    <div class="terminal-panel"
+         :class="sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'"
+         x-show="terminalOpen"
+         x-transition.opacity.duration.150ms>
+        {{template "terminal-panel" .}}
+    </div>
+
+    <!-- Confirmation modal -->
+    <dialog id="confirm-modal">
+        <article>
+            <h3 id="confirm-title"></h3>
+            <p id="confirm-message" class="text-sm text-muted" style="margin:0"></p>
+            <footer>
+                <button class="ghost sm" onclick="document.getElementById('confirm-modal').close()">CANCEL</button>
+                <button id="confirm-btn" class="sm">CONFIRM</button>
+            </footer>
+        </article>
+    </dialog>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- Scripts -->
+    <script src="/static/htmx.min.js"></script>
+    <script src="/static/ansi_up.min.js"></script>
+    <script src="/static/xterm.min.js"></script>
+    <script src="/static/xterm-addon-fit.min.js"></script>
+    <script src="/static/app.js"></script>
+    <script>
+    // On full page load (Ctrl+R or direct URL), load the correct partial
+    (function() {
+        var page = "{{.Page}}";
+        if (!page || page === "/") page = "/";
+        var map = {
+            "/": "/partials/overview",
+            "/logs": "/partials/logs",
+            "/metrics": "/partials/metrics",
+            "/settings": "/partials/settings",
+            "/seeders": "/partials/seeders",
+            "/services/new": "/partials/service-new"
+        };
+        var url = map[page];
+        if (!url && page.indexOf("/services/") === 0) {
+            var name = page.replace("/services/", "");
+            url = "/partials/service/" + name;
+        }
+        if (url) {
+            htmx.ajax('GET', url, {target: '#main-content', swap: 'innerHTML'});
+        }
+        setActiveNav(page);
+    })();
+    </script>
+    <script src="/static/alpine.min.js" defer></script>
+</body>
+</html>

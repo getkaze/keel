@@ -1,0 +1,77 @@
+{{define "service-card"}}
+<article class="card{{if eq .Status "running"}} card-running{{else if eq .Status "stopped"}} card-stopped{{else if eq .Status "unhealthy"}} card-unhealthy{{else}} card-unknown{{end}}"
+     id="card-{{.Name}}"
+     hx-get="/api/services/{{.Name}}"
+     hx-trigger="every 5s"
+     hx-swap="outerHTML"
+     hx-select="#card-{{.Name}}"
+     hx-indicator="find .poll-indicator"
+     style="cursor:pointer"
+     onclick="if(event.target.closest('button,a')==null) { htmx.ajax('GET','/partials/service/{{.Name}}',{target:'#main-content',swap:'innerHTML'}); history.pushState(null,'','/services/{{.Name}}'); }">
+
+    <!-- Header: name + status -->
+    <div class="flex items-center justify-between mb-2">
+        <strong class="service-name">{{.Name}}</strong>
+        <div class="flex items-center gap-1">
+            {{if eq .Status "running"}}
+            <span class="badge badge-success" role="status">
+                <span class="dot dot-success animate-pulse"></span>[RUN]
+            </span>
+            {{else if eq .Status "stopped"}}
+            <span class="badge badge-error" role="status">
+                <span class="dot dot-error"></span>[OFF]
+            </span>
+            {{else if eq .Status "unhealthy"}}
+            <span class="badge badge-warning" role="status">
+                <span class="dot dot-warning animate-pulse"></span>[ERR]
+            </span>
+            {{else}}
+            <span class="badge badge-ghost" role="status">
+                <span class="dot dot-ghost"></span>[???]
+            </span>
+            {{end}}
+        </div>
+    </div>
+
+    <!-- Metadata -->
+    <div class="flex flex-wrap gap-1 text-xs opacity-60 mb-2">
+        {{if .Ports.External}}
+        <span class="badge badge-ghost font-mono">:{{.Ports.External}}</span>
+        {{end}}
+        <span class="badge badge-ghost font-mono truncate">{{.Image}}</span>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="flex flex-wrap justify-end gap-1 mt-2">
+        {{if eq .Status "running"}}
+        <button class="ghost sm"
+                hx-post="/api/services/{{.Name}}/stop"
+                hx-swap="none">
+            <svg class="icon-sm"><use href="/static/lucide-sprite.svg#square"></use></svg>
+            STOP
+        </button>
+        <button class="ghost sm"
+                hx-post="/api/services/{{.Name}}/restart"
+                hx-swap="none">
+            <svg class="icon-sm"><use href="/static/lucide-sprite.svg#refresh-cw"></use></svg>
+            RESTART
+        </button>
+        {{else}}
+        <button class="sm"
+                hx-post="/api/services/{{.Name}}/start"
+                hx-swap="none">
+            <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
+            START
+        </button>
+        {{end}}
+        {{if .DashboardURL}}
+        <button class="ghost sm" onclick="window.open('{{.DashboardURL}}','_blank','noopener')">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            OPEN
+        </button>
+        {{end}}
+    </div>
+
+    <span class="poll-indicator" style="display:none"></span>
+</article>
+{{end}}

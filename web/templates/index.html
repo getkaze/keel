@@ -1,0 +1,10 @@
+{{define "content"}}
+<div id="page-loader"
+     hx-get="{{if eq .ServiceName "new"}}/partials/service-new{{else if .ServiceName}}/partials/service/{{.ServiceName}}{{else if eq .Page "/metrics"}}/partials/metrics{{else if eq .Page "/logs"}}/partials/logs{{else}}/partials/overview{{end}}"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <div class="flex items-center" style="justify-content:center;padding:3rem 0">
+        <span class="spinner spinner-lg"></span>
+    </div>
+</div>
+{{end}}

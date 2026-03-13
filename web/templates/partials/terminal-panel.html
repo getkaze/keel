@@ -1,0 +1,391 @@
+{{define "terminal-panel"}}
+<div id="terminal-container"
+     x-data="terminalPanel()"
+     x-effect="if (terminalOpen) $nextTick(() => initActiveTab())"
+     @connect-container.document="addContainerTab($event.detail.name)"
+     class="flex flex-col"
+     style="height:300px;background:var(--color-bg-code);min-height:0">
+
+    <!-- Header bar with resize handle -->
+    <div class="flex items-center justify-between cursor-row-resize select-none"
+         style="padding:0.375rem 0.75rem;border-bottom:1px solid var(--color-border);background:var(--color-bg-surface)"
+         @mousedown="startResize($event)">
+        <!-- Tab bar -->
+        <div class="flex items-center gap-0" style="overflow-x:auto;min-width:0;flex:1">
+            <template x-for="tab in tabs" :key="tab.id">
+                <div @mousedown.stop
+                     style="display:inline-flex;align-items:center;margin-right:1px;border-radius:4px 4px 0 0">
+                    <button @click="switchTab(tab.id)"
+                            style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.1875rem 0.625rem;
+                                   font-family:var(--font-mono);font-size:0.6875rem;border:none;cursor:pointer;
+                                   white-space:nowrap;border-radius:4px 4px 0 0;
+                                   transition:background 0.15s,color 0.15s"
+                            :style="activeTabId === tab.id
+                                ? 'background:var(--color-bg-code);color:var(--color-text)'
+                                : 'background:transparent;color:var(--color-text-muted)'">
+                        <span x-text="tab.label"></span>
+                        <span x-show="tab.connected"
+                              style="width:6px;height:6px;border-radius:50%;background:var(--color-primary);display:inline-block"></span>
+                        <span x-show="!tab.connected"
+                              style="width:6px;height:6px;border-radius:50%;background:var(--color-danger);display:inline-block"></span>
+                    </button>
+                    <button x-show="tab.id !== 'local'"
+                            @click="closeTab(tab.id)"
+                            style="border:none;cursor:pointer;color:var(--color-text-muted);font-size:0.75rem;
+                                   line-height:1;padding:2px 4px;border-radius:3px;background:transparent;
+                                   margin-right:4px"
+                            @mouseenter="$el.style.color='var(--color-danger)';$el.style.background='rgba(255,255,255,0.08)'"
+                            @mouseleave="$el.style.color='var(--color-text-muted)';$el.style.background='transparent'">&times;</button>
+                </div>
+            </template>
+        </div>
+        <div class="flex items-center gap-2" style="flex-shrink:0">
+            <button class="ghost sm" @click="terminalOpen = false" aria-label="Close terminal"
+                    style="margin:0;padding:0.125rem 0.375rem">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"
+                     viewBox="0 0 24 24">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Single viewport — terminal elements managed by JS -->
+    <div x-ref="terminalViewport" class="flex-1" style="background:var(--color-bg-code);padding:4px;min-height:0;overflow:hidden;position:relative"></div>
+</div>
+
+<script>
+function terminalPanel() {
+    return {
+        tabs: [
+            { id: 'local', label: 'Local', container: null, term: null, fitAddon: null, ws: null, connected: false, initialized: false, el: null }
+        ],
+        activeTabId: 'local',
+        resizing: false,
+        startY: 0,
+        startHeight: 0,
+        _nextId: 1,
+        _resizeObserver: null,
+
+        _createTermEl(tabId) {
+            var el = document.createElement('div');
+            el.id = 'term-' + tabId;
+            el.style.cssText = 'position:absolute;inset:0;';
+            el.style.display = 'none';
+            this.$refs.terminalViewport.appendChild(el);
+            return el;
+        },
+
+        initActiveTab() {
+            var tab = this.getActiveTab();
+            if (!tab) return;
+
+            if (tab.initialized) {
+                this._showOnly(tab.id);
+                if (tab.fitAddon) tab.fitAddon.fit();
+                if (tab.term) tab.term.focus();
+                return;
+            }
+
+            var viewport = this.$refs.terminalViewport;
+            if (!viewport) return;
+
+            // Create DOM element for this tab
+            if (!tab.el) {
+                tab.el = this._createTermEl(tab.id);
+            }
+
+            // Guard against duplicate init from concurrent callers
+            // (x-effect + switchTab can both call initActiveTab before requestAnimationFrame fires)
+            tab.initialized = true;
+
+            var self = this;
+            var openWithFont = function(fontFamily) {
+                tab.term = new Terminal({
+                    cursorBlink: true,
+                    cursorStyle: 'block',
+                    fontSize: 13,
+                    fontFamily: fontFamily,
+                    theme: {
+                        background: '#020202',
+                        foreground: '#e8ece8',
+                        cursor: '#00e05c',
+                        cursorAccent: '#000000',
+                        selectionBackground: '#00e05c40',
+                        black: '#0a0a0a',
+                        red: '#ff1c1c',
+                        green: '#00e05c',
+                        yellow: '#ffd700',
+                        blue: '#4d9aff',
+                        magenta: '#c678dd',
+                        cyan: '#00d4d4',
+                        white: '#e8ece8',
+                        brightBlack: '#858585',
+                        brightRed: '#ff5555',
+                        brightGreen: '#50fa7b',
+                        brightYellow: '#f1fa8c',
+                        brightBlue: '#6ba4ff',
+                        brightMagenta: '#ff79c6',
+                        brightCyan: '#8be9fd',
+                        brightWhite: '#f8f8f2'
+                    }
+                });
+
+                tab.fitAddon = new FitAddon.FitAddon();
+                tab.term.loadAddon(tab.fitAddon);
+                // Show element BEFORE open() so xterm.js measures real dimensions
+                self._showOnly(tab.id);
+                tab.term.open(tab.el);
+                requestAnimationFrame(function() {
+                    tab.fitAddon.fit();
+                    tab.initialized = true;
+                    self._initTabIO(tab);
+                });
+            };
+
+            // Resolve best monospace font for xterm.js canvas renderer.
+            // Probe whether 'Geist Mono' actually renders at monospace width.
+            var systemMono = "'DejaVu Sans Mono', 'Liberation Mono', 'Noto Sans Mono', 'Fira Code', monospace";
+            var preferredFont = "'Geist Mono', " + systemMono;
+
+            if (document.fonts && document.fonts.load) {
+                document.fonts.load('13px "Geist Mono"').then(function(loaded) {
+                    if (loaded && loaded.length > 0) {
+                        openWithFont(preferredFont);
+                    } else {
+                        openWithFont(systemMono);
+                    }
+                }).catch(function() {
+                    openWithFont(systemMono);
+                });
+            } else {
+                openWithFont(systemMono);
+            }
+        },
+
+        _initTabIO(tab) {
+            var self = this;
+            var tabId = tab.id;
+            tab.term.onData(function(data) {
+                var t = self.getTab(tabId);
+                if (t && t.ws && t.ws.readyState === WebSocket.OPEN) {
+                    t.ws.send(new TextEncoder().encode(data));
+                } else if (t && !t.connected && data === '\r') {
+                    t.term.clear();
+                    self.connectTab(tabId);
+                }
+            });
+
+            this.connectTab(tab.id);
+            this._setupResizeListeners();
+        },
+
+        _showOnly(activeId) {
+            for (var i = 0; i < this.tabs.length; i++) {
+                var t = this.tabs[i];
+                if (t.el) {
+                    t.el.style.display = t.id === activeId ? 'block' : 'none';
+                }
+            }
+        },
+
+        _setupResizeListeners() {
+            var self = this;
+            if (!this._resizeObserver) {
+                window.addEventListener('resize', function() {
+                    var tab = self.getActiveTab();
+                    if (tab && tab.fitAddon && self.terminalOpen) {
+                        tab.fitAddon.fit();
+                        self.sendResize(tab);
+                    }
+                });
+
+                var viewport = this.$refs.terminalViewport;
+                if (viewport) {
+                    this._resizeObserver = new ResizeObserver(function() {
+                        var tab = self.getActiveTab();
+                        if (tab && tab.fitAddon && self.terminalOpen) {
+                            tab.fitAddon.fit();
+                            self.sendResize(tab);
+                        }
+                    });
+                    this._resizeObserver.observe(viewport);
+                }
+            }
+        },
+
+        getTab(id) {
+            for (var i = 0; i < this.tabs.length; i++) {
+                if (this.tabs[i].id === id) return this.tabs[i];
+            }
+            return null;
+        },
+
+        getActiveTab() {
+            return this.getTab(this.activeTabId);
+        },
+
+        switchTab(id) {
+            this.activeTabId = id;
+            var self = this;
+            this.$nextTick(function() {
+                var tab = self.getActiveTab();
+                if (tab && tab.initialized) {
+                    self._showOnly(id);
+                    tab.fitAddon.fit();
+                    self.sendResize(tab);
+                    tab.term.focus();
+                } else if (tab && !tab.initialized) {
+                    self.initActiveTab();
+                }
+            });
+        },
+
+        addContainerTab(name) {
+            for (var i = 0; i < this.tabs.length; i++) {
+                if (this.tabs[i].container === name) {
+                    this.switchTab(this.tabs[i].id);
+                    return;
+                }
+            }
+
+            var tabId = 'container-' + this._nextId++;
+            this.tabs.push({
+                id: tabId,
+                label: name,
+                container: name,
+                term: null,
+                fitAddon: null,
+                ws: null,
+                connected: false,
+                initialized: false,
+                el: null
+            });
+
+            var self = this;
+            this.$nextTick(function() {
+                self.switchTab(tabId);
+            });
+        },
+
+        closeTab(id) {
+            var tab = this.getTab(id);
+            if (!tab || tab.id === 'local') return;
+
+            // Null out references BEFORE close/dispose so async callbacks
+            // (ws.onclose) see tab.ws !== thisWs and bail out immediately,
+            // preventing writes to a disposed terminal.
+            var ws = tab.ws;
+            var term = tab.term;
+            tab.ws = null;
+            tab.term = null;
+            tab.connected = false;
+
+            if (ws && ws.readyState <= WebSocket.OPEN) {
+                ws.close();
+            }
+            if (term) {
+                term.dispose();
+            }
+            if (tab.el && tab.el.parentNode) {
+                tab.el.parentNode.removeChild(tab.el);
+            }
+
+            this.tabs = this.tabs.filter(function(t) { return t.id !== id; });
+
+            if (this.activeTabId === id) {
+                this.switchTab('local');
+            }
+        },
+
+        connectTab(tabId) {
+            var tab = this.getTab(tabId);
+            if (!tab) return;
+
+            var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            var path = tab.container
+                ? '/ws/terminal/exec/' + encodeURIComponent(tab.container)
+                : '/ws/terminal';
+            var url = protocol + '//' + window.location.host + path;
+
+            tab.ws = new WebSocket(url);
+            tab.ws.binaryType = 'arraybuffer';
+
+            var self = this;
+            var thisWs = tab.ws;
+
+            tab.ws.onopen = function() {
+                tab.connected = true;
+                self.tabs = self.tabs.slice();
+                // Send real dimensions — server clears screen after first resize
+                self.sendResize(tab);
+                if (self.activeTabId === tabId && tab.term) {
+                    tab.term.focus();
+                }
+            };
+
+            tab.ws.onmessage = function(e) {
+                if (e.data instanceof ArrayBuffer && tab.term) {
+                    tab.term.write(new Uint8Array(e.data));
+                }
+            };
+
+            tab.ws.onclose = function() {
+                if (tab.ws !== thisWs) return;
+                tab.connected = false;
+                self.tabs = self.tabs.slice();
+                if (tab.term) {
+                    tab.term.write('\r\n\x1b[31mConnection lost.\x1b[0m Press Enter to reconnect...');
+                }
+            };
+
+            tab.ws.onerror = function() {
+                if (tab.ws !== thisWs) return;
+                tab.connected = false;
+                self.tabs = self.tabs.slice();
+            };
+        },
+
+        sendResize(tab) {
+            if (tab.ws && tab.ws.readyState === WebSocket.OPEN && tab.term) {
+                tab.ws.send(JSON.stringify({
+                    type: 'resize',
+                    cols: tab.term.cols,
+                    rows: tab.term.rows
+                }));
+            }
+        },
+
+        startResize(e) {
+            this.resizing = true;
+            this.startY = e.clientY;
+            var container = document.getElementById('terminal-container');
+            this.startHeight = container.offsetHeight;
+
+            var self = this;
+            function onMove(e) {
+                if (!self.resizing) return;
+                var delta = self.startY - e.clientY;
+                var newHeight = Math.max(150, Math.min(window.innerHeight * 0.8, self.startHeight + delta));
+                container.style.height = newHeight + 'px';
+            }
+
+            function onUp() {
+                self.resizing = false;
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                var tab = self.getActiveTab();
+                if (tab && tab.fitAddon) {
+                    tab.fitAddon.fit();
+                    self.sendResize(tab);
+                }
+            }
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        }
+    };
+}
+</script>
+{{end}}

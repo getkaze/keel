@@ -1,0 +1,39 @@
+{{define "operation-progress"}}
+<div id="operation-panel"
+     class="operation-panel"
+     :class="sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'"
+     x-data="{ open: false }"
+     x-show="open"
+     x-cloak
+     x-transition
+     @operation-start.window="open = true"
+     @operation-close.window="open = false">
+
+    <!-- Header bar -->
+    <div class="flex items-center justify-between border-b"
+         style="padding:0.375rem 1rem;background:var(--color-bg-surface)">
+        <div class="flex items-center gap-2">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"
+                 style="color:var(--color-primary)" class="animate-pulse">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-primary);letter-spacing:var(--tracking-wide)">
+                OPERATION OUTPUT
+            </span>
+        </div>
+        <button class="ghost sm" @click="open = false" aria-label="Close operation panel"
+                style="margin:0;padding:0.125rem 0.375rem">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Scrollable output area -->
+    <div id="operation-output"
+         class="overflow-auto font-mono text-xs"
+         style="height:16rem;line-height:var(--leading-relaxed);background:var(--color-bg-code);padding:var(--space-3) var(--space-4);white-space:pre-wrap;word-break:break-all;color:var(--color-primary)">
+    </div>
+</div>
+{{end}}

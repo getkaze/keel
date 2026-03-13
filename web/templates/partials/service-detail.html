@@ -1,0 +1,143 @@
+{{define "service-detail"}}
+<div class="space-y-4" id="service-detail-{{.Name}}"
+     hx-get="/partials/service/{{.Name}}"
+     hx-trigger="refreshServices from:body"
+     hx-swap="outerHTML">
+
+    <!-- Header -->
+    <div class="detail-header">
+        <div class="detail-header-left">
+            <a href="/"
+               hx-get="/partials/overview" hx-target="#main-content" hx-swap="innerHTML" hx-push-url="/"
+               class="ghost sm">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#chevron-left"></use></svg>
+                BACK
+            </a>
+            <h1 class="detail-service-name">{{.Name}}</h1>
+            {{if eq .Status "running"}}
+            <span class="badge badge-success"><span class="dot dot-success animate-pulse"></span>[RUN]</span>
+            {{else if eq .Status "stopped"}}
+            <span class="badge badge-error"><span class="dot dot-error"></span>[OFF]</span>
+            {{else if eq .Status "unhealthy"}}
+            <span class="badge badge-warning"><span class="dot dot-warning animate-pulse"></span>[ERR]</span>
+            {{else}}
+            <span class="badge badge-ghost"><span class="dot dot-ghost"></span>[???]</span>
+            {{end}}
+        </div>
+        <div class="detail-actions">
+            <div class="detail-actions-primary">
+                {{if eq .Status "running"}}
+                <button class="sm" onclick="connectToContainer('{{.Name}}')">
+                    <svg class="icon-sm"><use href="/static/lucide-sprite.svg#terminal"></use></svg>
+                    CONNECT
+                </button>
+                <button class="ghost sm" hx-post="/api/services/{{.Name}}/stop" hx-swap="none">
+                    <svg class="icon-sm"><use href="/static/lucide-sprite.svg#square"></use></svg>
+                    STOP
+                </button>
+                <button class="ghost sm" hx-post="/api/services/{{.Name}}/restart" hx-swap="none">
+                    <svg class="icon-sm"><use href="/static/lucide-sprite.svg#refresh-cw"></use></svg>
+                    RESTART
+                </button>
+                {{else}}
+                <button class="sm" hx-post="/api/services/{{.Name}}/start" hx-swap="none">
+                    <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
+                    START
+                </button>
+                {{end}}
+                <button class="ghost sm" hx-post="/api/services/{{.Name}}/update" hx-swap="none">
+                    <svg class="icon-sm"><use href="/static/lucide-sprite.svg#arrow-up-circle"></use></svg>
+                    UPDATE
+                </button>
+                {{if .DashboardURL}}
+                <button class="ghost sm" onclick="window.open('{{.DashboardURL}}','_blank','noopener')">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    OPEN
+                </button>
+                {{end}}
+            </div>
+            <span class="detail-actions-divider"></span>
+            <button class="btn-ghost-danger sm"
+                    hx-delete="/api/services/{{.Name}}"
+                    hx-confirm="Delete {{.Name}}? This will stop and remove the container and its config."
+                    hx-swap="none">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#trash-2"></use></svg>
+                DELETE
+            </button>
+        </div>
+    </div>
+
+    <!-- Info row -->
+    <div class="detail-info-grid">
+        <div class="detail-info-card">
+            <div class="detail-info-label">IMAGE</div>
+            <div class="detail-info-value" title="{{.Image}}">{{.Image}}</div>
+        </div>
+        <div class="detail-info-card">
+            <div class="detail-info-label">HOSTNAME</div>
+            <div class="detail-info-value">{{.Hostname}}</div>
+        </div>
+        <div class="detail-info-card">
+            <div class="detail-info-label">NETWORK</div>
+            <div class="detail-info-value">{{.Network}}</div>
+        </div>
+        {{if .Ports.External}}
+        <div class="detail-info-card">
+            <div class="detail-info-label">PORTS</div>
+            <div class="detail-info-value">{{.Ports.External}} → {{.Ports.Internal}}</div>
+        </div>
+        {{end}}
+        {{if .RAMEstimateMB}}
+        <div class="detail-info-card">
+            <div class="detail-info-label">RAM EST.</div>
+            <div class="detail-info-value">{{.RAMEstimateMB}} MB</div>
+        </div>
+        {{end}}
+    </div>
+
+    <!-- Config editor -->
+    <div class="detail-info-card">
+        <div class="detail-section-header">
+            <span class="detail-section-title">CONFIG</span>
+            <div class="flex gap-2">
+                <button class="ghost sm"
+                        onclick="saveServiceConfig('{{.Name}}', this)">
+                    <svg class="icon-sm"><use href="/static/lucide-sprite.svg#save"></use></svg>
+                    SAVE
+                </button>
+            </div>
+        </div>
+        <textarea id="config-editor-{{.Name}}"
+                  class="detail-config-textarea"
+                  spellcheck="false">{{.RawConfig}}</textarea>
+    </div>
+
+    <!-- Logs link -->
+    <div class="detail-info-card">
+        <div class="detail-section-header">
+            <span class="detail-section-title">LOGS</span>
+            <button class="ghost sm" onclick="navigateToLogs('{{.Name}}')">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#terminal"></use></svg>
+                VIEW LOGS
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function saveServiceConfig(name, btn) {
+    var ta = document.getElementById('config-editor-' + name);
+    if(!ta) return;
+    btn.disabled = true;
+    fetch('/api/services/' + name + '/config', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'config=' + encodeURIComponent(ta.value)
+    }).then(function(r){
+        btn.disabled = false;
+        if(r.ok) { showToast('Config saved', 'success'); }
+        else { r.text().then(function(t){ showToast('Error: ' + t, 'error'); }); }
+    }).catch(function(e){ btn.disabled = false; showToast('Error: ' + e, 'error'); });
+}
+</script>
+{{end}}

@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }}/${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            goarch: amd64
+            goos: linux
+          - os: linux
+            arch: arm64
+            goarch: arm64
+            goos: linux
+          - os: darwin
+            arch: amd64
+            goarch: amd64
+            goos: darwin
+          - os: darwin
+            arch: arm64
+            goarch: arm64
+            goos: darwin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION="${{ github.ref_name }}"
+          go build \
+            -ldflags "-s -w -X main.version=${VERSION}" \
+            -o "bin/keel-${{ matrix.os }}-${{ matrix.arch }}" \
+            .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: keel-${{ matrix.os }}-${{ matrix.arch }}
+          path: bin/keel-${{ matrix.os }}-${{ matrix.arch }}
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            ## keel ${{ github.ref_name }}
+
+            ### Instalação
+
+            ```bash
+            curl -fsSL https://getkaze.dev/keel/install.sh | bash
+            ```
+
+            ### Download manual
+
+            | Plataforma | Link |
+            |---|---|
+            | Linux amd64  | [keel-linux-amd64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-linux-amd64) |
+            | Linux arm64  | [keel-linux-arm64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-linux-arm64) |
+            | macOS amd64  | [keel-darwin-amd64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-darwin-amd64) |
+            | macOS arm64  | [keel-darwin-arm64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-darwin-arm64) |
+          files: |
+            artifacts/keel-linux-amd64/keel-linux-amd64
+            artifacts/keel-linux-arm64/keel-linux-arm64
+            artifacts/keel-darwin-amd64/keel-darwin-amd64
+            artifacts/keel-darwin-arm64/keel-darwin-arm64
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
