@@ -80,7 +80,7 @@ jobs:
             ### Instalação
 
             ```bash
-            curl -fsSL https://getkaze.dev/keel/install.sh | bash
+            curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash
             ```
 
             ### Download manual

@@ -47,7 +47,7 @@ Initial public release.
 ### Deployment targets
 
 - Local target (direct Docker socket, `127.0.0.1`)
-- Remote targets via SSH tunnel (automatic Docker socket forwarding on port 60001)
+- Remote targets via SSH tunnel (remote Docker socket forwarded to a local Unix socket)
 - Per-target SSH key, jump host, port binding, and external IP configuration
 - Remote file sync for volume mounts via scp
 

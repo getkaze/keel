@@ -224,7 +224,7 @@ keel start           # commands now execute on ec2 via SSH
 keel target local    # switch back
 ```
 
-For remote targets, an SSH tunnel is opened automatically on port **60001**.
+For remote targets, an SSH tunnel is opened automatically, forwarding the remote Docker socket to a local Unix socket (`/tmp/keel-docker-<target>.sock`).
 
 ---
 
