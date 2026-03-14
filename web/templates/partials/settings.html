@@ -1,48 +1,45 @@
 {{define "settings"}}
-<div class="page-content">
+<div>
+    <!-- Page header -->
     <div class="page-header">
-        <h2>SETTINGS</h2>
-        <p class="text-muted text-sm">Application settings</p>
+        <span class="page-title">Settings</span>
+        <span class="page-subtitle">application settings</span>
     </div>
 
-    <!-- About -->
-    <div class="detail-info-card" style="margin-bottom:var(--space-4)">
-        <div class="detail-info-header">
-            <h3>About Keel</h3>
-        </div>
-        <div class="detail-info-body" style="display:flex;flex-direction:column;gap:var(--space-3)">
-            <p class="text-sm" style="margin:0;color:var(--color-text-secondary)">
+    <div style="padding:20px 24px">
+        <!-- About -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <span class="chart-title">about keel</span>
+            </div>
+            <p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 0 12px">
                 Keel is a free, open-source Docker container management dashboard.
             </p>
-            <div class="detail-info-row">
-                <span class="detail-info-label">Version</span>
-                <span class="detail-info-value" style="font-family:var(--font-mono)">{{.Version}}</span>
+            <div style="display:flex;gap:8px;align-items:center">
+                <span style="font-family:var(--mono);font-size:10px;color:var(--muted2);letter-spacing:.08em;text-transform:uppercase">version</span>
+                <span style="font-family:var(--mono);font-size:11px;color:var(--text)">{{.Version}}</span>
             </div>
         </div>
-    </div>
 
-    <!-- Support -->
-    <div class="detail-info-card">
-        <div class="detail-info-header">
-            <h3>Support the project</h3>
-        </div>
-        <div class="detail-info-body" style="display:flex;flex-direction:column;gap:var(--space-3)">
-            <p class="text-sm" style="margin:0;color:var(--color-text-secondary)">
+        <!-- Support -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <span class="chart-title">support the project</span>
+            </div>
+            <p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:0 0 12px">
                 If Keel is useful to you, consider buying me a coffee to support development.
             </p>
-            <div>
-                <a href="https://buymeacoffee.com/metzker" target="_blank" rel="noopener"
-                   class="btn primary sm" style="display:inline-flex;align-items:center;gap:var(--space-2)">
-                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17 8h1a4 4 0 1 1 0 8h-1"/>
-                        <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/>
-                        <line x1="6" y1="2" x2="6" y2="4"/>
-                        <line x1="10" y1="2" x2="10" y2="4"/>
-                        <line x1="14" y1="2" x2="14" y2="4"/>
-                    </svg>
-                    BUY ME A COFFEE
-                </a>
-            </div>
+            <a href="https://buymeacoffee.com/metzker" target="_blank" rel="noopener"
+               class="btn btn-primary sm">
+                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 8h1a4 4 0 1 1 0 8h-1"/>
+                    <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/>
+                    <line x1="6" y1="2" x2="6" y2="4"/>
+                    <line x1="10" y1="2" x2="10" y2="4"/>
+                    <line x1="14" y1="2" x2="14" y2="4"/>
+                </svg>
+                Buy me a coffee
+            </a>
         </div>
     </div>
 </div>

@@ -3,47 +3,46 @@
      x-data="terminalPanel()"
      x-effect="if (terminalOpen) $nextTick(() => initActiveTab())"
      @connect-container.document="addContainerTab($event.detail.name)"
-     class="flex flex-col"
-     style="height:300px;background:var(--color-bg-code);min-height:0">
+     style="height:300px;background:var(--terminal-bg);min-height:0;display:flex;flex-direction:column">
 
     <!-- Header bar with resize handle -->
-    <div class="flex items-center justify-between cursor-row-resize select-none"
-         style="padding:0.375rem 0.75rem;border-bottom:1px solid var(--color-border);background:var(--color-bg-surface)"
-         @mousedown="startResize($event)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;user-select:none">
         <!-- Tab bar -->
-        <div class="flex items-center gap-0" style="overflow-x:auto;min-width:0;flex:1">
+        <div class="terminal-tabs" style="border:none;overflow-x:auto;flex:1" @mousedown.stop>
             <template x-for="tab in tabs" :key="tab.id">
-                <div @mousedown.stop
-                     style="display:inline-flex;align-items:center;margin-right:1px;border-radius:4px 4px 0 0">
+                <div style="display:inline-flex;align-items:center">
                     <button @click="switchTab(tab.id)"
-                            style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.1875rem 0.625rem;
-                                   font-family:var(--font-mono);font-size:0.6875rem;border:none;cursor:pointer;
-                                   white-space:nowrap;border-radius:4px 4px 0 0;
-                                   transition:background 0.15s,color 0.15s"
-                            :style="activeTabId === tab.id
-                                ? 'background:var(--color-bg-code);color:var(--color-text)'
-                                : 'background:transparent;color:var(--color-text-muted)'">
+                            class="terminal-tab"
+                            :class="activeTabId === tab.id ? 'active' : ''"
+                            style="border-right:none;height:32px;padding:0 12px">
                         <span x-text="tab.label"></span>
                         <span x-show="tab.connected"
-                              style="width:6px;height:6px;border-radius:50%;background:var(--color-primary);display:inline-block"></span>
+                              style="width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 4px var(--green);display:inline-block"></span>
                         <span x-show="!tab.connected"
-                              style="width:6px;height:6px;border-radius:50%;background:var(--color-danger);display:inline-block"></span>
+                              style="width:5px;height:5px;border-radius:50%;background:var(--red);display:inline-block"></span>
                     </button>
                     <button x-show="tab.id !== 'local'"
                             @click="closeTab(tab.id)"
-                            style="border:none;cursor:pointer;color:var(--color-text-muted);font-size:0.75rem;
-                                   line-height:1;padding:2px 4px;border-radius:3px;background:transparent;
-                                   margin-right:4px"
-                            @mouseenter="$el.style.color='var(--color-danger)';$el.style.background='rgba(255,255,255,0.08)'"
-                            @mouseleave="$el.style.color='var(--color-text-muted)';$el.style.background='transparent'">&times;</button>
+                            style="border:none;cursor:pointer;color:var(--muted2);font-size:12px;line-height:1;padding:2px 4px;border-radius:3px;background:transparent;margin-right:4px"
+                            @mouseenter="$el.style.color='var(--red)'"
+                            @mouseleave="$el.style.color='var(--muted2)'">&times;</button>
                 </div>
             </template>
         </div>
-        <div class="flex items-center gap-2" style="flex-shrink:0">
-            <button class="ghost sm" @click="terminalOpen = false" aria-label="Close terminal"
-                    style="margin:0;padding:0.125rem 0.375rem">
-                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"
-                     viewBox="0 0 24 24">
+        <div style="display:flex;align-items:center;gap:2px;flex-shrink:0" @mousedown.stop>
+            <button class="btn btn-ghost sm" @click="toggleMaximize()" aria-label="Maximize terminal"
+                    style="margin:0;padding:3px 8px">
+                <svg x-show="!maximized" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                </svg>
+                <svg x-show="maximized" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <rect x="6" y="3" width="15" height="15" rx="2"/>
+                    <path d="M6 7H4a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-2"/>
+                </svg>
+            </button>
+            <button class="btn btn-ghost sm" @click="terminalOpen = false" aria-label="Close terminal"
+                    style="margin:0;padding:3px 8px">
+                <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                     <line x1="18" y1="6" x2="6" y2="18"/>
                     <line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
@@ -51,8 +50,8 @@
         </div>
     </div>
 
-    <!-- Single viewport — terminal elements managed by JS -->
-    <div x-ref="terminalViewport" class="flex-1" style="background:var(--color-bg-code);padding:4px;min-height:0;overflow:hidden;position:relative"></div>
+    <!-- Terminal viewport -->
+    <div x-ref="terminalViewport" style="flex:1;background:var(--terminal-bg);padding:4px;min-height:0;overflow:hidden;position:relative"></div>
 </div>
 
 <script>
@@ -62,9 +61,7 @@ function terminalPanel() {
             { id: 'local', label: 'Local', container: null, term: null, fitAddon: null, ws: null, connected: false, initialized: false, el: null }
         ],
         activeTabId: 'local',
-        resizing: false,
-        startY: 0,
-        startHeight: 0,
+        maximized: false,
         _nextId: 1,
         _resizeObserver: null,
 
@@ -91,13 +88,10 @@ function terminalPanel() {
             var viewport = this.$refs.terminalViewport;
             if (!viewport) return;
 
-            // Create DOM element for this tab
             if (!tab.el) {
                 tab.el = this._createTermEl(tab.id);
             }
 
-            // Guard against duplicate init from concurrent callers
-            // (x-effect + switchTab can both call initActiveTab before requestAnimationFrame fires)
             tab.initialized = true;
 
             var self = this;
@@ -108,20 +102,20 @@ function terminalPanel() {
                     fontSize: 13,
                     fontFamily: fontFamily,
                     theme: {
-                        background: '#020202',
-                        foreground: '#e8ece8',
-                        cursor: '#00e05c',
+                        background: '#050505',
+                        foreground: '#e8e8e8',
+                        cursor: '#8b5cf6',
                         cursorAccent: '#000000',
-                        selectionBackground: '#00e05c40',
+                        selectionBackground: '#8b5cf640',
                         black: '#0a0a0a',
-                        red: '#ff1c1c',
-                        green: '#00e05c',
-                        yellow: '#ffd700',
-                        blue: '#4d9aff',
+                        red: '#ef4444',
+                        green: '#22c55e',
+                        yellow: '#eab308',
+                        blue: '#3b82f6',
                         magenta: '#c678dd',
                         cyan: '#00d4d4',
-                        white: '#e8ece8',
-                        brightBlack: '#858585',
+                        white: '#e8e8e8',
+                        brightBlack: '#666666',
                         brightRed: '#ff5555',
                         brightGreen: '#50fa7b',
                         brightYellow: '#f1fa8c',
@@ -134,7 +128,6 @@ function terminalPanel() {
 
                 tab.fitAddon = new FitAddon.FitAddon();
                 tab.term.loadAddon(tab.fitAddon);
-                // Show element BEFORE open() so xterm.js measures real dimensions
                 self._showOnly(tab.id);
                 tab.term.open(tab.el);
                 requestAnimationFrame(function() {
@@ -144,13 +137,11 @@ function terminalPanel() {
                 });
             };
 
-            // Resolve best monospace font for xterm.js canvas renderer.
-            // Probe whether 'Geist Mono' actually renders at monospace width.
             var systemMono = "'DejaVu Sans Mono', 'Liberation Mono', 'Noto Sans Mono', 'Fira Code', monospace";
-            var preferredFont = "'Geist Mono', " + systemMono;
+            var preferredFont = "'JetBrains Mono', " + systemMono;
 
             if (document.fonts && document.fonts.load) {
-                document.fonts.load('13px "Geist Mono"').then(function(loaded) {
+                document.fonts.load('13px "JetBrains Mono"').then(function(loaded) {
                     if (loaded && loaded.length > 0) {
                         openWithFont(preferredFont);
                     } else {
@@ -273,9 +264,6 @@ function terminalPanel() {
             var tab = this.getTab(id);
             if (!tab || tab.id === 'local') return;
 
-            // Null out references BEFORE close/dispose so async callbacks
-            // (ws.onclose) see tab.ws !== thisWs and bail out immediately,
-            // preventing writes to a disposed terminal.
             var ws = tab.ws;
             var term = tab.term;
             tab.ws = null;
@@ -286,7 +274,7 @@ function terminalPanel() {
                 ws.close();
             }
             if (term) {
-                term.dispose();
+                try { term.dispose(); } catch(e) {}
             }
             if (tab.el && tab.el.parentNode) {
                 tab.el.parentNode.removeChild(tab.el);
@@ -318,7 +306,6 @@ function terminalPanel() {
             tab.ws.onopen = function() {
                 tab.connected = true;
                 self.tabs = self.tabs.slice();
-                // Send real dimensions — server clears screen after first resize
                 self.sendResize(tab);
                 if (self.activeTabId === tabId && tab.term) {
                     tab.term.focus();
@@ -357,33 +344,23 @@ function terminalPanel() {
             }
         },
 
-        startResize(e) {
-            this.resizing = true;
-            this.startY = e.clientY;
+        toggleMaximize() {
             var container = document.getElementById('terminal-container');
-            this.startHeight = container.offsetHeight;
-
             var self = this;
-            function onMove(e) {
-                if (!self.resizing) return;
-                var delta = self.startY - e.clientY;
-                var newHeight = Math.max(150, Math.min(window.innerHeight * 0.8, self.startHeight + delta));
-                container.style.height = newHeight + 'px';
+            if (this.maximized) {
+                container.style.height = '300px';
+                this.maximized = false;
+            } else {
+                container.style.height = 'calc(100vh - 48px)';
+                this.maximized = true;
             }
-
-            function onUp() {
-                self.resizing = false;
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
+            this.$nextTick(function() {
                 var tab = self.getActiveTab();
                 if (tab && tab.fitAddon) {
                     tab.fitAddon.fit();
                     self.sendResize(tab);
                 }
-            }
-
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
+            });
         }
     };
 }

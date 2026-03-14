@@ -1,102 +1,164 @@
 {{define "metrics-panel"}}
 <div id="metrics-content" hx-get="/partials/metrics" hx-trigger="every 10s" hx-swap="outerHTML">
 
-    <!-- Host gauges -->
-    <div class="metrics-panel">
-        <!-- CPU -->
-        <article class="metrics-card">
-            <div class="metrics-card-header">
-                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
-                <strong class="metrics-card-label">CPU</strong>
-                <span class="metrics-card-value">{{printf "%.1f" .CPU.UsagePercent}}%</span>
-            </div>
-            <progress class="metrics-progress {{progressColor .CPU.UsagePercent}}"
-                      value="{{printf "%.0f" .CPU.UsagePercent}}" max="100"></progress>
-        </article>
-
-        <!-- Memory -->
-        <article class="metrics-card">
-            <div class="metrics-card-header">
-                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M6 19v-3m4 3v-6m4 6V9m4 10V5"/></svg>
-                <strong class="metrics-card-label">RAM</strong>
-                <span class="metrics-card-value">{{printf "%.1f" .Memory.UsagePercent}}%</span>
-            </div>
-            <progress class="metrics-progress {{progressColor .Memory.UsagePercent}}"
-                      value="{{printf "%.0f" .Memory.UsagePercent}}" max="100"></progress>
-            <div class="metrics-card-detail">
-                {{formatBytes .Memory.UsedBytes}} / {{formatBytes .Memory.TotalBytes}}
-            </div>
-        </article>
-
-        <!-- Disk -->
-        <article class="metrics-card">
-            <div class="metrics-card-header">
-                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg>
-                <strong class="metrics-card-label">DISK</strong>
-                <span class="metrics-card-value">{{printf "%.1f" .Disk.UsagePercent}}%</span>
-            </div>
-            <progress class="metrics-progress {{progressColor .Disk.UsagePercent}}"
-                      value="{{printf "%.0f" .Disk.UsagePercent}}" max="100"></progress>
-            <div class="metrics-card-detail">
-                {{formatBytes .Disk.UsedBytes}} / {{formatBytes .Disk.TotalBytes}}
-            </div>
-        </article>
-
-        <!-- Load Average -->
-        <article class="metrics-card">
-            <div class="metrics-card-header">
-                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                <strong class="metrics-card-label">LOAD AVG</strong>
-            </div>
-            <div class="metrics-card-detail">
-                {{printf "%.2f" .LoadAvg.Load1}} · {{printf "%.2f" .LoadAvg.Load5}} · {{printf "%.2f" .LoadAvg.Load15}}
-            </div>
-        </article>
-
-        <!-- Uptime -->
-        <article class="metrics-card">
-            <div class="metrics-card-header">
-                <svg width="16" height="16" style="color:var(--color-primary);opacity:0.7;flex-shrink:0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <strong class="metrics-card-label">UPTIME</strong>
-            </div>
-            <div class="metrics-card-detail">
-                {{formatUptime .Uptime.UptimeSeconds}}
-            </div>
-        </article>
+    <!-- Page header -->
+    <div class="page-header">
+        <span class="page-title">Metrics</span>
+        <span class="page-subtitle">host &amp; container resources</span>
     </div>
 
-    <!-- Container resources -->
-    {{if .Containers}}
-    <div class="metrics-containers">
-        <h3 class="metrics-section-title">Container Resources</h3>
-        <div class="metrics-table-wrap">
-            <table class="metrics-table">
-                <thead>
-                    <tr>
-                        <th>CONTAINER</th>
-                        <th>CPU</th>
-                        <th>MEMORY</th>
-                        <th>MEM %</th>
-                        <th>NET I/O</th>
-                        <th>BLOCK I/O</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .Containers}}
-                    <tr>
-                        <td>{{.Name}}</td>
-                        <td>{{.CPUPerc}}</td>
-                        <td>{{.MemUsage}}</td>
-                        <td>{{.MemPerc}}</td>
-                        <td>{{.NetIO}}</td>
-                        <td>{{.BlockIO}}</td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
+    <div style="padding:20px 24px">
+        <!-- Big metric cards -->
+        <div class="metrics-top">
+            <!-- CPU -->
+            <div class="metric-big">
+                <div class="metric-big-label">cpu usage</div>
+                <div class="metric-big-value">{{printf "%.1f" .CPU.UsagePercent}}<em>%</em></div>
+                <div class="metric-big-sub">system load</div>
+            </div>
+
+            <!-- Memory -->
+            <div class="metric-big">
+                <div class="metric-big-label">memory</div>
+                <div class="metric-big-value">{{printf "%.1f" .Memory.UsagePercent}}<em>%</em></div>
+                <div class="metric-big-sub">{{formatBytes .Memory.UsedBytes}} / {{formatBytes .Memory.TotalBytes}}</div>
+            </div>
+
+            <!-- Disk -->
+            <div class="metric-big">
+                <div class="metric-big-label">disk</div>
+                <div class="metric-big-value">{{printf "%.1f" .Disk.UsagePercent}}<em>%</em></div>
+                <div class="metric-big-sub">{{formatBytes .Disk.UsedBytes}} / {{formatBytes .Disk.TotalBytes}}</div>
+            </div>
+
+            <!-- Load Average -->
+            <div class="metric-big">
+                <div class="metric-big-label">load average</div>
+                <div class="metric-big-value">{{printf "%.2f" .LoadAvg.Load1}}</div>
+                <div class="metric-big-sub">{{printf "%.2f" .LoadAvg.Load5}} · {{printf "%.2f" .LoadAvg.Load15}}</div>
+            </div>
+
+            <!-- Uptime -->
+            <div class="metric-big">
+                <div class="metric-big-label">uptime</div>
+                <div class="metric-big-value" style="font-size:18px">{{formatUptime .Uptime.UptimeSeconds}}</div>
+                <div class="metric-big-sub">system uptime</div>
+            </div>
         </div>
-    </div>
-    {{end}}
 
+        <!-- Container resources table -->
+        {{if .Containers}}
+        <div class="metrics-containers">
+            <div class="metrics-section-title">container resources</div>
+            <div class="metrics-table-wrap">
+                <table class="container-table" id="metrics-container-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" onclick="sortMetricsTable(0,'text')">container <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortMetricsTable(1,'perc')">cpu <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortMetricsTable(2,'bytes')">memory <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortMetricsTable(3,'perc')">mem % <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortMetricsTable(4,'bytes')">net i/o <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortMetricsTable(5,'bytes')">block i/o <span class="sort-icon"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Containers}}
+                        <tr>
+                            <td>{{.Name}}</td>
+                            <td>{{.CPUPerc}}</td>
+                            <td>{{.MemUsage}}</td>
+                            <td>{{.MemPerc}}</td>
+                            <td>{{.NetIO}}</td>
+                            <td>{{.BlockIO}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {{end}}
+    </div>
+
+</div>
+
+<script>
+(function() {
+    var _sortCol = -1;
+    var _sortAsc = true;
+
+    function parseBytes(s) {
+        if (!s) return 0;
+        var parts = s.split('/');
+        return _parseSingleBytes(parts[0].trim());
+    }
+
+    function _parseSingleBytes(s) {
+        var m = s.match(/([\d.]+)\s*(B|kB|KB|MB|MiB|GB|GiB|TB|TiB)/i);
+        if (!m) return 0;
+        var v = parseFloat(m[1]);
+        var u = m[2].toUpperCase();
+        if (u === 'KB' || u === 'KIB' || u === 'KB') return v * 1024;
+        if (u === 'MB' || u === 'MIB') return v * 1024 * 1024;
+        if (u === 'GB' || u === 'GIB') return v * 1024 * 1024 * 1024;
+        if (u === 'TB' || u === 'TIB') return v * 1024 * 1024 * 1024 * 1024;
+        return v;
+    }
+
+    function parsePerc(s) {
+        var m = s.match(/([\d.]+)/);
+        return m ? parseFloat(m[1]) : 0;
+    }
+
+    window.sortMetricsTable = function(col, type) {
+        var table = document.getElementById('metrics-container-table');
+        if (!table) return;
+
+        if (_sortCol === col) {
+            _sortAsc = !_sortAsc;
+        } else {
+            _sortCol = col;
+            _sortAsc = true;
+        }
+
+        var tbody = table.tBodies[0];
+        var rows = Array.prototype.slice.call(tbody.rows);
+
+        rows.sort(function(a, b) {
+            var aText = a.cells[col].textContent.trim();
+            var bText = b.cells[col].textContent.trim();
+            var av, bv;
+
+            if (type === 'text') {
+                av = aText.toLowerCase();
+                bv = bText.toLowerCase();
+                return _sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+            } else if (type === 'perc') {
+                av = parsePerc(aText);
+                bv = parsePerc(bText);
+            } else if (type === 'bytes') {
+                av = parseBytes(aText);
+                bv = parseBytes(bText);
+            }
+            return _sortAsc ? av - bv : bv - av;
+        });
+
+        for (var i = 0; i < rows.length; i++) {
+            tbody.appendChild(rows[i]);
+        }
+
+        var icons = table.querySelectorAll('.sort-icon');
+        for (var j = 0; j < icons.length; j++) {
+            icons[j].textContent = '';
+            icons[j].className = 'sort-icon';
+        }
+        var activeIcon = table.querySelectorAll('th')[col].querySelector('.sort-icon');
+        if (activeIcon) {
+            activeIcon.textContent = _sortAsc ? '▲' : '▼';
+            activeIcon.className = 'sort-icon active';
+        }
+    };
+})();
+</script>
 </div>
 {{end}}

@@ -1,59 +1,55 @@
 {{define "config-editor"}}
-<div class="flex flex-col" style="height:calc(100vh - 5rem)"
+<div style="display:flex;flex-direction:column;height:100%"
      x-data="configEditor()"
      x-init="load()">
 
-    <!-- Toolbar -->
-    <div class="config-toolbar flex-wrap">
-        <h2>services.json</h2>
-
-        <!-- Validate -->
-        <button class="ghost sm" @click="validate()" :disabled="saving" style="margin:0">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-            VALIDATE
-        </button>
-
-        <!-- Revert -->
-        <button class="ghost sm" @click="revert()" :disabled="saving" style="margin:0">
-            <svg class="icon-sm"><use href="/static/lucide-sprite.svg#refresh-cw"></use></svg>
-            REVERT
-        </button>
-
-        <!-- Save -->
-        <button class="sm" @click="save()" :disabled="saving || !dirty" style="margin:0">
-            <svg class="icon-sm"><use href="/static/lucide-sprite.svg#save"></use></svg>
-            SAVE
-        </button>
-
-        <!-- Apply -->
-        <button class="secondary sm" @click="apply()" :disabled="saving || dirty" style="margin:0"
-                title="Save first, then apply to update all services">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
-            APPLY
-        </button>
+    <!-- Page header -->
+    <div class="page-header">
+        <span class="page-title">services.json</span>
+        <div class="page-actions">
+            <button class="btn btn-ghost sm" @click="validate()" :disabled="saving" style="margin:0">
+                <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                Validate
+            </button>
+            <button class="btn btn-ghost sm" @click="revert()" :disabled="saving" style="margin:0">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#refresh-cw"></use></svg>
+                Revert
+            </button>
+            <button class="btn btn-primary sm" @click="save()" :disabled="saving || !dirty" style="margin:0">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#save"></use></svg>
+                Save
+            </button>
+            <button class="btn btn-ghost sm" @click="apply()" :disabled="saving || dirty" style="margin:0"
+                    title="Save first, then apply to update all services">
+                <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+                Apply
+            </button>
+        </div>
     </div>
 
     <!-- Validation message -->
-    <div x-show="message" x-transition class="mt-2">
+    <div x-show="message" x-transition style="padding:8px 24px">
         <div class="alert" :class="messageType === 'error' ? 'alert-error' : 'alert-success'">
-            <span x-text="message" class="text-sm"></span>
+            <span x-text="message"></span>
         </div>
     </div>
 
     <!-- Editor textarea -->
-    <textarea x-ref="editor"
-              class="config-editor-textarea"
-              x-model="content"
-              @input="dirty = true; message = ''"
-              spellcheck="false"
-              autocomplete="off"
-              autocorrect="off"
-              autocapitalize="off"></textarea>
+    <div style="flex:1;padding:0 24px 12px;display:flex;flex-direction:column;min-height:0">
+        <textarea x-ref="editor"
+                  class="config-editor-textarea"
+                  x-model="content"
+                  @input="dirty = true; message = ''"
+                  spellcheck="false"
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="off"></textarea>
 
-    <!-- Footer info -->
-    <div class="config-status-bar">
-        <span x-text="dirty ? 'Unsaved changes' : 'No changes'"></span>
-        <span x-text="content ? content.split('\\n').length + ' lines' : ''"></span>
+        <!-- Footer info -->
+        <div class="config-status-bar">
+            <span x-text="dirty ? 'Unsaved changes' : 'No changes'"></span>
+            <span x-text="content ? content.split('\\n').length + ' lines' : ''"></span>
+        </div>
     </div>
 </div>
 
