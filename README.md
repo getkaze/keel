@@ -335,7 +335,7 @@ go test ./...
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=getkaze/keel&type=Date)](https://star-history.com/#getkaze/keel&Date)
+[![Star History Chart](https://api.star-history.com/image?repos=getkaze/keel&type=date&legend=top-left)](https://www.star-history.com/?repos=getkaze%2Fkeel&type=date&legend=top-left)
 
 ---
 

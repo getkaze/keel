@@ -9,11 +9,28 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Maximize/restore button on the terminal panel (@mateusmetzker)
+- Sortable columns on the metrics container resources table (container, cpu, memory, mem %, net i/o, block i/o) (@mateusmetzker)
+
+### Removed
+
+- Terminal drag-to-resize (replaced by maximize/restore toggle) (@mateusmetzker)
+
+---
+
+## [0.1.1] — 2026-03-13
+
+### Changed
+
+- Translated all Portuguese strings to English in the GitHub release workflow, dev installer, and GHCR setup prompts (@mateusmetzker)
+
 ---
 
 ## [0.1.0] — 2026-03-13
 
-Initial public release.
+Initial public release (@mateusmetzker).
 
 ### Dashboard
 
@@ -82,5 +99,6 @@ Initial public release.
 - Data directory: `/var/lib/keel` (Linux) or `~/.keel` (macOS)
 - Install script: `curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash`
 
-[Unreleased]: https://github.com/getkaze/keel/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/getkaze/keel/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/getkaze/keel/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/getkaze/keel/releases/tag/v0.1.0

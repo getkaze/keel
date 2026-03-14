@@ -5,18 +5,13 @@ set -euo pipefail
 
 BINARY_NAME="keel"
 INSTALL_DIR="/usr/local/bin"
-REPO="getkaze/keel"
-API_BASE="https://api.github.com/repos/${REPO}"
-RELEASES_BASE="https://github.com/${REPO}/releases"
+RELEASES_BASE="https://github.com/getkaze/keel/releases"
 
 # ── color helpers ──────────────────────────────────────────────────────────────
 bold=$(tput bold 2>/dev/null || true)
 reset=$(tput sgr0 2>/dev/null || true)
 green=$(tput setaf 2 2>/dev/null || true)
-cyan=$(tput setaf 6 2>/dev/null || true)
-yellow=$(tput setaf 3 2>/dev/null || true)
 red=$(tput setaf 1 2>/dev/null || true)
-dim=$(tput dim 2>/dev/null || true)
 
 info()  { echo "${bold}==>${reset} $*"; }
 ok()    { echo "${green}  ✓${reset} $*"; }
@@ -24,8 +19,6 @@ fail()  { echo "${red}error:${reset} $*" >&2; exit 1; }
 
 # ── sanity checks ─────────────────────────────────────────────────────────────
 [ "$(id -u)" = "0" ] || fail "please run with sudo:\n\n  curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash"
-
-command -v curl &>/dev/null || command -v wget &>/dev/null || fail "curl or wget is required"
 
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 case "$OS" in
@@ -51,75 +44,15 @@ else
   KEEL_DIR="/var/lib/keel"
 fi
 
-# ── http helper ───────────────────────────────────────────────────────────────
-http_get() {
-  if command -v curl &>/dev/null; then
-    curl -fsSL "$1"
-  else
-    wget -qO- "$1"
-  fi
-}
-
-# ── version picker TUI ────────────────────────────────────────────────────────
-pick_version() {
-  # If KEEL_VERSION is set in env, skip TUI
-  if [ -n "${KEEL_VERSION:-}" ]; then
-    VERSION="$KEEL_VERSION"
-    return
-  fi
-
-  info "fetching available releases"
-
-  # Pull tag_name list from GitHub API (no jq needed)
-  local releases_json
-  releases_json="$(http_get "${API_BASE}/releases" 2>/dev/null)" \
-    || fail "could not reach GitHub API — check your internet connection"
-
-  # Extract tag names preserving order (latest first)
-  local versions=()
-  while IFS= read -r line; do
-    versions+=("$line")
-  done < <(printf '%s' "$releases_json" | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
-
-  [ "${#versions[@]}" -gt 0 ] || fail "no releases found for ${REPO}"
-
-  # ── draw menu ────────────────────────────────────────────────────────────────
-  clear 2>/dev/null || true
-  echo ""
-  echo "${bold}${cyan}  keel installer${reset}"
-  echo "${dim}  ${OS}/${ARCH}${reset}"
-  echo ""
-  echo "${bold}  Select a version to install:${reset}"
-  echo ""
-
-  local i=1
-  for v in "${versions[@]}"; do
-    if [ "$i" = "1" ]; then
-      printf "  ${green}%2d)${reset}  %s  ${dim}(latest)${reset}\n" "$i" "$v"
-    else
-      printf "  ${yellow}%2d)${reset}  %s\n" "$i" "$v"
-    fi
-    i=$((i + 1))
-  done
-
-  echo ""
-  printf "  ${bold}Choice [1]:${reset} "
-  local choice
-  read -r choice < /dev/tty
-  choice="${choice:-1}"
-
-  # Validate input is a number in range
-  case "$choice" in
-    ''|*[!0-9]*) fail "invalid choice: '${choice}'" ;;
-  esac
-  [ "$choice" -ge 1 ] && [ "$choice" -le "${#versions[@]}" ] \
-    || fail "choice out of range (1–${#versions[@]})"
-
-  VERSION="${versions[$((choice - 1))]}"
-  echo ""
-}
-
-pick_version
+# Detect KEEL_VERSION (optional — defaults to latest)
+VERSION="${KEEL_VERSION:-}"
+if [ -z "$VERSION" ]; then
+  info "fetching latest version"
+  VERSION="$(curl -fsSL -o /dev/null -w '%{url_effective}' "${RELEASES_BASE}/latest" 2>/dev/null || true)"
+  VERSION="${VERSION##*/}"
+  [ -n "$VERSION" ] && [ "$VERSION" != "latest" ] || fail "could not fetch latest version from ${RELEASES_BASE}/latest"
+  VERSION="$(echo "$VERSION" | tr -d '[:space:]')"
+fi
 
 DOWNLOAD_URL="${RELEASES_BASE}/download/${VERSION}/${BINARY_NAME}-${OS}-${ARCH}"
 
@@ -131,8 +64,10 @@ trap 'rm -f "$TMP"' EXIT
 
 if command -v curl &>/dev/null; then
   curl -fsSL "$DOWNLOAD_URL" -o "$TMP"
-else
+elif command -v wget &>/dev/null; then
   wget -qO "$TMP" "$DOWNLOAD_URL"
+else
+  fail "curl or wget is required"
 fi
 
 chmod +x "$TMP"
