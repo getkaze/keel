@@ -83,13 +83,13 @@ func TestMatchServiceToContainer_EmptyList(t *testing.T) {
 
 func TestMatchServiceToContainer_ExplicitHostname(t *testing.T) {
 	containers := []ContainerInfo{
-		{Names: "gaudium-mysql57", State: "running"},
+		{Names: "myapp-mysql57", State: "running"},
 	}
-	ci := MatchServiceToContainer("mysql57", "gaudium-mysql57", containers)
+	ci := MatchServiceToContainer("mysql57", "myapp-mysql57", containers)
 	if ci == nil {
-		t.Fatal("expected match via explicit hostname 'gaudium-mysql57', got nil")
+		t.Fatal("expected match via explicit hostname 'myapp-mysql57', got nil")
 	}
-	if ci.Names != "gaudium-mysql57" {
-		t.Errorf("expected gaudium-mysql57, got %q", ci.Names)
+	if ci.Names != "myapp-mysql57" {
+		t.Errorf("expected myapp-mysql57, got %q", ci.Names)
 	}
 }
