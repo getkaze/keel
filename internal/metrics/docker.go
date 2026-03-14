@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/getkaze/keel/internal/model"
@@ -21,8 +22,57 @@ type dockerStatsJSON struct {
 	BlockIO  string `json:"BlockIO"`
 }
 
-// ReadDockerStats returns per-container resource usage via docker stats.
-func ReadDockerStats(ctx context.Context) ([]model.ContainerStats, error) {
+// StatsPoller provides cached Docker stats with a configurable TTL.
+type StatsPoller struct {
+	mu     sync.RWMutex
+	cache  []model.ContainerStats
+	expiry time.Time
+	ttl    time.Duration
+}
+
+// NewStatsPoller creates a poller with a 5-second cache TTL.
+func NewStatsPoller() *StatsPoller {
+	return &StatsPoller{
+		ttl: 5 * time.Second,
+	}
+}
+
+// ReadStats returns cached docker stats, refreshing if expired.
+func (p *StatsPoller) ReadStats(ctx context.Context) ([]model.ContainerStats, error) {
+	p.mu.RLock()
+	if time.Now().Before(p.expiry) {
+		cached := p.cache
+		p.mu.RUnlock()
+		return cached, nil
+	}
+	p.mu.RUnlock()
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Double-check after acquiring write lock.
+	if time.Now().Before(p.expiry) {
+		return p.cache, nil
+	}
+
+	stats, err := fetchDockerStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	p.cache = stats
+	p.expiry = time.Now().Add(p.ttl)
+	return stats, nil
+}
+
+// Invalidate forces the next call to fetch fresh data.
+func (p *StatsPoller) Invalidate() {
+	p.mu.Lock()
+	p.expiry = time.Time{}
+	p.mu.Unlock()
+}
+
+func fetchDockerStats(ctx context.Context) ([]model.ContainerStats, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

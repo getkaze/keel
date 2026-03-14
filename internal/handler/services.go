@@ -13,20 +13,23 @@ import (
 
 	"github.com/getkaze/keel/internal/config"
 	"github.com/getkaze/keel/internal/docker"
+	"github.com/getkaze/keel/internal/metrics"
 	"github.com/getkaze/keel/internal/model"
 )
 
 // ServiceView combines a service definition with its runtime status.
 type ServiceView struct {
 	model.Service
-	Status    model.ContainerStatus `json:"status"`
-	Container *docker.ContainerInfo `json:"container,omitempty"`
+	Status    model.ContainerStatus  `json:"status"`
+	Container *docker.ContainerInfo  `json:"container,omitempty"`
+	Stats     *model.ContainerStats  `json:"stats,omitempty"`
 }
 
 // ServiceDeps bundles dependencies for service handlers.
 type ServiceDeps struct {
 	Services   *config.ServiceStore
 	Docker     *docker.StatusPoller
+	Stats      *metrics.StatsPoller
 	Executor   *docker.Executor
 	SeederExec *docker.SeederExecutor
 	Mutex      *OpMutex
@@ -46,6 +49,7 @@ func RegisterServiceRoutes(mux *http.ServeMux, deps *ServiceDeps) {
 	mux.HandleFunc("POST /api/services/{name}/update", deps.updateService)
 	mux.HandleFunc("GET /api/services/start-all", deps.startAll)
 	mux.HandleFunc("GET /api/services/stop-all", deps.stopAll)
+	mux.HandleFunc("GET /api/services/{name}/metrics", deps.getServiceMetrics)
 	mux.HandleFunc("GET /api/services/{name}/config", deps.getServiceConfig)
 	mux.HandleFunc("PUT /api/services/{name}/config", deps.saveServiceConfig)
 }
@@ -426,6 +430,45 @@ func (d *ServiceDeps) updateService(w http.ResponseWriter, r *http.Request) {
 	d.streamCommand(w, r, "update", name)
 }
 
+func (d *ServiceDeps) getServiceMetrics(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	svc, err := d.Services.Get(name)
+	if err != nil || svc == nil {
+		http.Error(w, "service not found", http.StatusNotFound)
+		return
+	}
+
+	allStats, err := d.Stats.ReadStats(r.Context())
+	if err != nil {
+		http.Error(w, "failed to read docker stats", http.StatusInternalServerError)
+		return
+	}
+
+	// Match by hostname (docker container name)
+	hostname := svc.Hostname
+	for _, cs := range allStats {
+		if cs.Name == hostname || cs.Name == "keel-"+name || cs.Name == name {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if d.Tmpl != nil {
+				d.Tmpl.ExecuteTemplate(w, "service-metrics", cs)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(cs)
+			return
+		}
+	}
+
+	// Container not found in docker stats — return empty metrics
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if d.Tmpl != nil {
+		d.Tmpl.ExecuteTemplate(w, "service-metrics", model.ContainerStats{})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(model.ContainerStats{})
+}
+
 func (d *ServiceDeps) getServiceConfig(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	data, err := d.Services.GetRaw(name)
@@ -513,15 +556,33 @@ func (d *ServiceDeps) buildServiceViews(ctx context.Context) ([]ServiceView, err
 	}
 
 	containers, _ := d.Docker.ListContainers(ctx)
+	allStats, _ := d.Stats.ReadStats(ctx)
+
+	// Index stats by container name for fast lookup
+	statsMap := make(map[string]*model.ContainerStats, len(allStats))
+	for i := range allStats {
+		statsMap[allStats[i].Name] = &allStats[i]
+	}
 
 	var views []ServiceView
 	for _, svc := range services {
 		ci := docker.MatchServiceToContainer(svc.Name, svc.Hostname, containers)
-		views = append(views, ServiceView{
+		view := ServiceView{
 			Service:   svc,
 			Status:    docker.ContainerToStatus(ci),
 			Container: ci,
-		})
+		}
+		// Attach stats for running containers
+		if view.Status == model.StatusRunning {
+			if s := statsMap[svc.Hostname]; s != nil {
+				view.Stats = s
+			} else if s := statsMap["keel-"+svc.Name]; s != nil {
+				view.Stats = s
+			} else if s := statsMap[svc.Name]; s != nil {
+				view.Stats = s
+			}
+		}
+		views = append(views, view)
 	}
 	return views, nil
 }

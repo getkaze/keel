@@ -270,6 +270,9 @@ func runReset(args []string, keelDir string) {
 			}
 		}
 
+		// Clear seeder state for seeders targeting this service
+		docker.ClearSeederStateForService(keelDir, svc.Name)
+
 		fmt.Printf("[%s] booting\n", svc.Name)
 		if err := runner.Boot(ctx, svc, keelDir); err != nil {
 			fmt.Fprintf(os.Stderr, "[%s] boot error: %v\n", svc.Name, err)

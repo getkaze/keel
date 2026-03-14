@@ -106,10 +106,14 @@ func registerRoutes(mux *http.ServeMux, cfg Config) {
 		render(w, "/services/"+name, name)
 	})
 
+	// Shared stats poller (caches docker stats for 5s)
+	statsPoller := metrics.NewStatsPoller()
+
 	// Shared service deps
 	svcDeps := &handler.ServiceDeps{
 		Services: services,
 		Docker:   poller,
+		Stats:    statsPoller,
 		Executor: executor,
 		Mutex:    opMutex,
 		AppCtx:   cfg.Ctx,
@@ -140,12 +144,12 @@ func registerRoutes(mux *http.ServeMux, cfg Config) {
 
 	// WebSocket: terminal
 	mux.Handle("GET /ws/terminal", &handler.TerminalHandler{})
-	mux.Handle("GET /ws/terminal/exec/{name}", &handler.ExecTerminalHandler{})
+	mux.Handle("GET /ws/terminal/exec/{name}", &handler.ExecTerminalHandler{Services: services})
 
 	// API: target, health, metrics, version
 	mux.Handle("GET /api/target", &handler.TargetHandler{KeelDir: cfg.KeelDir})
 	mux.Handle("GET /api/health", &handler.HealthHandler{Services: services, Docker: poller})
-	metricsHandler := &handler.MetricsHandler{}
+	metricsHandler := &handler.MetricsHandler{Stats: statsPoller}
 	if cfg.Target != nil && cfg.Target.Mode == "remote" {
 		metricsHandler.Remote = metrics.NewRemoteCollector(cfg.Target)
 	}
@@ -157,6 +161,7 @@ func registerRoutes(mux *http.ServeMux, cfg Config) {
 		Services:       services,
 		Seeders:        seeders,
 		Docker:         poller,
+		Stats:          statsPoller,
 		Tmpl:           tmpl,
 		Version:        cfg.Version,
 		Remote:         metricsHandler.Remote,

@@ -110,6 +110,12 @@ func (h *LogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 			return
 		}
+		// Check if path is a directory — require a file selection.
+		if isContainerDir(ctx, containerName, logSource.Path) {
+			fmt.Fprintf(w, "event: error\ndata: select a file from the dropdown\n\n")
+			flusher.Flush()
+			return
+		}
 		cmdArgs = []string{"exec", containerName, "tail", "-n", strconv.Itoa(lines), "-f", logSource.Path}
 	} else {
 		cmdArgs = []string{"logs", "--follow", "--tail", strconv.Itoa(lines), containerName}
@@ -232,9 +238,9 @@ func listLogFiles(ctx context.Context, containerName, logPath string) []LogSourc
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	// Use find to list files — works for both files and directories
+	// Use find to list all files — works for both files and directories
 	cmd := exec.CommandContext(ctx, "docker", "exec", containerName,
-		"find", logPath, "-type", "f", "-name", "*.log", "-o", "-name", "*.txt", "-o", "-name", "*.out")
+		"find", logPath, "-type", "f")
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -281,6 +287,14 @@ func listHostLogFiles(hostPath string) []LogSourceFile {
 		return nil
 	})
 	return files
+}
+
+// isContainerDir checks if a path inside a container is a directory.
+func isContainerDir(ctx context.Context, containerName, path string) bool {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "exec", containerName, "test", "-d", path)
+	return cmd.Run() == nil
 }
 
 // isWithinDir returns true if p is inside (or equal to) dir.

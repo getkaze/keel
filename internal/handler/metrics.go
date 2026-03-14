@@ -13,6 +13,7 @@ import (
 // MetricsHandler handles GET /api/metrics.
 type MetricsHandler struct {
 	Remote *metrics.RemoteCollector // nil for local targets
+	Stats  *metrics.StatsPoller
 }
 
 func (h *MetricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func (h *MetricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}()
 		go func() {
 			defer wg.Done()
-			containers, _ = metrics.ReadDockerStats(r.Context())
+			containers, _ = h.Stats.ReadStats(r.Context())
 		}()
 	} else {
 		wg.Add(4)
@@ -66,7 +67,7 @@ func (h *MetricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}()
 		go func() {
 			defer wg.Done()
-			containers, _ = metrics.ReadDockerStats(r.Context())
+			containers, _ = h.Stats.ReadStats(r.Context())
 		}()
 	}
 	wg.Wait()
