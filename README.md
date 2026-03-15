@@ -61,7 +61,7 @@ keel target                    # show active target
 keel target ec2                # switch to remote target
 
 # Dev mode — mount local code into a container with hot reload
-keel dev mchtracker ~/projects/mchtracker
+keel dev api ~/projects/api
 
 # Seeders — run data seeding scripts inside containers
 keel seed                      # run all seeders
