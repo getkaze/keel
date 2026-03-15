@@ -9,15 +9,21 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.2]
 
+---
+
+## [0.2] — 2026-03-15
+
 ### Added
 
 - Maximize/restore button on the terminal panel (@mateusmetzker)
 - Sortable columns on the metrics container resources table (container, cpu, memory, mem %, net i/o, block i/o) (@mateusmetzker)
 - Mobile responsive layout with breakpoints at 768px and 480px (@mateusmetzker)
+- Update modal with changelog and one-click update from the dashboard (@mateusmetzker)
 
 ### Changed
 
 - Replaced Inter + JetBrains Mono with Recursive variable font, aligned with Kaze design system (@mateusmetzker)
+- Release workflow now includes "What's new" section extracted from CHANGELOG.md (@mateusmetzker)
 
 ### Removed
 
@@ -104,6 +110,7 @@ Initial public release (@mateusmetzker).
 - Data directory: `/var/lib/keel` (Linux) or `~/.keel` (macOS)
 - Install script: `curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash`
 
-[Unreleased]: https://github.com/getkaze/keel/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/getkaze/keel/compare/v0.2...HEAD
+[0.2]: https://github.com/getkaze/keel/compare/v0.1.1...v0.2
 [0.1.1]: https://github.com/getkaze/keel/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/getkaze/keel/releases/tag/v0.1.0
