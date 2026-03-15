@@ -13,6 +13,11 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Maximize/restore button on the terminal panel (@mateusmetzker)
 - Sortable columns on the metrics container resources table (container, cpu, memory, mem %, net i/o, block i/o) (@mateusmetzker)
+- Mobile responsive layout with breakpoints at 768px and 480px (@mateusmetzker)
+
+### Changed
+
+- Replaced Inter + JetBrains Mono with Recursive variable font, aligned with Kaze design system (@mateusmetzker)
 
 ### Removed
 
