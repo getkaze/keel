@@ -185,10 +185,12 @@ func openBrowser(url string) {
 	} else {
 		cmds = []string{"xdg-open", "sensible-browser", "x-www-browser", "firefox", "chromium", "google-chrome"}
 	}
+	devNull, _ := os.Open(os.DevNull)
+	defer devNull.Close()
 	for _, cmd := range cmds {
 		if path, err := exec.LookPath(cmd); err == nil {
 			if p, err := os.StartProcess(path, []string{path, url}, &os.ProcAttr{
-				Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
+				Files: []*os.File{devNull, devNull, devNull},
 			}); err == nil {
 				_ = p.Release()
 				return
