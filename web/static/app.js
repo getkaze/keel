@@ -180,13 +180,13 @@ document.addEventListener('keydown', function(e) {
 
 // Navigation: update active state on nav items
 function setActiveNav(page) {
-    document.querySelectorAll('.nav-item[data-page]').forEach(function(el) {
+    document.querySelectorAll('[data-page]').forEach(function(el) {
         el.classList.toggle('active', el.getAttribute('data-page') === page);
     });
 }
 
 document.addEventListener('click', function(e) {
-    var navItem = e.target.closest('.nav-item[data-page]');
+    var navItem = e.target.closest('[data-page]');
     if (!navItem) return;
     setActiveNav(navItem.getAttribute('data-page'));
 });
@@ -268,6 +268,7 @@ document.addEventListener('DOMContentLoaded', applyStaggerToGrids);
 // --- Seeders ---
 
 function setSeederStatus(name, status) {
+    sessionStorage.setItem('seederStatus-' + name, status);
     var card = document.getElementById('seeder-card-' + name);
     var badge = document.getElementById('seeder-status-' + name);
     if (card) {
@@ -308,12 +309,14 @@ function toggleSeederLog(name) {
 
 function appendSeederLog(name, text) {
     var output = document.getElementById('seeder-log-output-' + name);
-    if (!output) return;
-    var el = document.createElement('div');
-    el.textContent = text;
-    output.appendChild(el);
-    output.scrollTop = output.scrollHeight;
-    sessionStorage.setItem('seederLog-' + name, output.innerHTML);
+    var line = '<div>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+    var stored = sessionStorage.getItem('seederLog-' + name) || '';
+    stored += line;
+    sessionStorage.setItem('seederLog-' + name, stored);
+    if (output) {
+        output.innerHTML = stored;
+        output.scrollTop = output.scrollHeight;
+    }
 }
 
 // Restore seeder statuses and per-card logs when seeders partial is loaded
@@ -326,9 +329,13 @@ document.addEventListener('htmx:afterSwap', function(e) {
     if (!document.getElementById('seeders-page')) return;
 
     // Restore statuses and logs from sessionStorage
-    document.querySelectorAll('.seeder-card[data-last-status]').forEach(function(card) {
+    document.querySelectorAll('.seeder-item').forEach(function(card) {
         var name = card.id.replace('seeder-card-', '');
-        var status = card.dataset.lastStatus;
+
+        // Prefer live status from sessionStorage over server-rendered data-last-status
+        var liveStatus = sessionStorage.getItem('seederStatus-' + name);
+        var serverStatus = card.dataset.lastStatus;
+        var status = liveStatus || serverStatus;
         if (status) setSeederStatus(name, status);
 
         var logHtml = sessionStorage.getItem('seederLog-' + name);

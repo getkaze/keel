@@ -16,6 +16,7 @@ type SeederView struct {
 	TargetStatus model.ContainerStatus `json:"target_status"`
 	CommandCount int                   `json:"command_count"`
 	LastStatus   string                `json:"last_status,omitempty"`
+	LastRanAt    string                `json:"last_ran_at,omitempty"`
 }
 
 // SeederDeps bundles dependencies for seeder handlers.
@@ -36,6 +37,9 @@ func RegisterSeederRoutes(mux *http.ServeMux, deps *SeederDeps) {
 }
 
 func (d *SeederDeps) listSeeders(w http.ResponseWriter, r *http.Request) {
+	// Reload state from disk to pick up changes made by CLI.
+	d.Executor.ReloadState()
+
 	seeders, err := d.Seeders.List()
 	if err != nil {
 		http.Error(w, "failed to list seeders", http.StatusInternalServerError)
@@ -60,11 +64,16 @@ func (d *SeederDeps) listSeeders(w http.ResponseWriter, r *http.Request) {
 	views := make([]SeederView, 0, len(seeders))
 	for _, sd := range seeders {
 		ci := docker.MatchServiceToContainer(sd.Target, svcHostnames[sd.Target], containers)
+		lastRanAt := ""
+		if t := d.Executor.GetLastRanAt(sd.Name); !t.IsZero() {
+			lastRanAt = t.Format("2006-01-02 15:04")
+		}
 		views = append(views, SeederView{
 			Seeder:       sd,
 			TargetStatus: docker.ContainerToStatus(ci),
 			CommandCount: len(sd.Commands),
 			LastStatus:   d.Executor.GetLastStatus(sd.Name),
+			LastRanAt:    lastRanAt,
 		})
 	}
 

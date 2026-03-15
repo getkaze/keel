@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# keel dev installer — instala bin/keel local para testes
+# keel dev installer — installs bin/keel locally for testing
 # Usage: sudo bash install-dev.sh
 set -euo pipefail
 
@@ -27,22 +27,22 @@ info() { echo "${bold}==>${reset} $*"; }
 ok()   { echo "${green}  ✓${reset} $*"; }
 fail() { echo "${red}error:${reset} $*" >&2; exit 1; }
 
-[ "$(id -u)" = "0" ] || fail "rode com sudo: sudo bash install-dev.sh"
-[ -f "$BIN_PATH" ] || fail "bin/keel não encontrado — rode 'make build' primeiro"
+[ "$(id -u)" = "0" ] || fail "run with sudo: sudo bash install-dev.sh"
+[ -f "$BIN_PATH" ] || fail "bin/keel not found — run 'make build' first"
 
-# ── instalar binário ───────────────────────────────────────────────────────────
-info "instalando ${BIN_PATH} -> ${INSTALL_DIR}/${BINARY_NAME}"
+# ── install binary ─────────────────────────────────────────────────────────────
+info "installing ${BIN_PATH} -> ${INSTALL_DIR}/${BINARY_NAME}"
 cp "$BIN_PATH" "${INSTALL_DIR}/${BINARY_NAME}"
 chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
-ok "binário instalado"
+ok "binary installed"
 
-# ── criar diretórios de dados ─────────────────────────────────────────────────
-info "configurando ${KEEL_DIR}"
+# ── create data directories ────────────────────────────────────────────────────
+info "configuring ${KEEL_DIR}"
 mkdir -p "${KEEL_DIR}/data/services"
 mkdir -p "${KEEL_DIR}/data/seeders"
 mkdir -p "${KEEL_DIR}/data/config/traefik"
 mkdir -p "${KEEL_DIR}/state"
-ok "diretórios criados"
+ok "directories created"
 
 # Initialize config.json if not present
 if [ ! -f "${KEEL_DIR}/data/config.json" ]; then
@@ -52,12 +52,12 @@ if [ ! -f "${KEEL_DIR}/data/config.json" ]; then
   "network_subnet": "172.20.1.0/24"
 }
 JSON
-  ok "config.json criado"
+  ok "config.json created"
 fi
 
 if [ ! -f "${KEEL_DIR}/state/target" ]; then
   echo "local" > "${KEEL_DIR}/state/target"
-  ok "target padrão: local"
+  ok "default target: local"
 fi
 
 if [ ! -f "${KEEL_DIR}/data/targets.json" ]; then
@@ -74,40 +74,40 @@ if [ ! -f "${KEEL_DIR}/data/targets.json" ]; then
   "default": "local"
 }
 JSON
-  ok "targets.json criado"
+  ok "targets.json created"
 fi
 
 # ── ghcr setup ────────────────────────────────────────────────────────────────
 setup_ghcr() {
   if [ -s "${KEEL_DIR}/state/ghcr-user" ] && [ -s "${KEEL_DIR}/state/ghcr-pat" ]; then
-    ok "credenciais ghcr já configuradas"
+    ok "ghcr credentials already configured"
     return
   fi
   echo ""
   echo "${bold}GitHub Container Registry (ghcr.io)${reset}"
-  echo "  Necessário para imagens de packages privados do GitHub."
+  echo "  Required for private GitHub package images."
   echo ""
-  printf "  Usar ghcr.io? [s/N] "
+  printf "  Use ghcr.io? [y/N] "
   read -r use_ghcr < /dev/tty
   case "$use_ghcr" in
-    [sS]|[sS][iI][mM])
+    [yY]|[yY][eE][sS])
       echo ""
-      printf "  Usuário do GitHub: "
+      printf "  GitHub username: "
       read -r ghcr_user < /dev/tty
-      [ -n "$ghcr_user" ] || { echo "${red}  usuário não pode ser vazio${reset}"; return; }
+      [ -n "$ghcr_user" ] || { echo "${red}  username cannot be empty${reset}"; return; }
 
       printf "  Personal Access Token (PAT): "
       read -rs ghcr_pat < /dev/tty
       echo ""
-      [ -n "$ghcr_pat" ] || { echo "${red}  PAT não pode ser vazio${reset}"; return; }
+      [ -n "$ghcr_pat" ] || { echo "${red}  PAT cannot be empty${reset}"; return; }
 
       printf '%s' "$ghcr_user" > "${KEEL_DIR}/state/ghcr-user"
       printf '%s' "$ghcr_pat"  > "${KEEL_DIR}/state/ghcr-pat"
       chmod 600 "${KEEL_DIR}/state/ghcr-user" "${KEEL_DIR}/state/ghcr-pat"
-      ok "credenciais ghcr salvas"
+      ok "ghcr credentials saved"
       ;;
     *)
-      ok "ghcr ignorado"
+      ok "ghcr skipped"
       ;;
   esac
 }
@@ -117,15 +117,15 @@ setup_ghcr
 REAL_USER="${REAL_USER:-${SUDO_USER:-}}"
 if [ -n "$REAL_USER" ]; then
   chown -R "${REAL_USER}" "${KEEL_DIR}"
-  ok "ownership de ${KEEL_DIR} para ${REAL_USER}"
+  ok "ownership of ${KEEL_DIR} set to ${REAL_USER}"
 fi
 
 # ── done ──────────────────────────────────────────────────────────────────────
 VERSION="$("${INSTALL_DIR}/${BINARY_NAME}" version 2>/dev/null || echo "dev")"
 echo ""
-echo "${bold}keel ${VERSION} instalado (dev build)${reset}"
+echo "${bold}keel ${VERSION} installed (dev build)${reset}"
 echo ""
-echo "  keel            # dashboard (porta 60000)"
-echo "  keel target     # target ativo"
-echo "  keel help       # todos os comandos"
+echo "  keel            # dashboard (port 60000)"
+echo "  keel target     # active target"
+echo "  keel help       # all commands"
 echo ""

@@ -130,6 +130,8 @@ func ContainerToStatus(ci *ContainerInfo) model.ContainerStatus {
 			return model.StatusUnhealthy
 		}
 		return model.StatusRunning
+	case "restarting":
+		return model.StatusRestarting
 	default:
 		return model.StatusStopped
 	}

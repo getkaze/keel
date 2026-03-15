@@ -61,7 +61,7 @@ keel target                    # show active target
 keel target ec2                # switch to remote target
 
 # Dev mode — mount local code into a container with hot reload
-keel dev mchtracker ~/projects/mchtracker
+keel dev api ~/projects/api
 
 # Seeders — run data seeding scripts inside containers
 keel seed                      # run all seeders
@@ -88,7 +88,6 @@ keel help
 | `-port` | `60000` | HTTP port |
 | `-bind` | `127.0.0.1` | Bind address |
 | `-keel-dir` | `/var/lib/keel` | Data directory |
-| `-open` | `false` | Open browser on start |
 | `-dev` | `false` | Serve web assets from filesystem |
 
 Override the data directory with `KEEL_DIR` environment variable.
@@ -271,7 +270,7 @@ Each service is a JSON file in `data/services/`. Full example:
 |-------|-----------|
 | Backend | Go 1.24, stdlib `net/http`, `gorilla/websocket`, `creack/pty` |
 | Frontend | HTMX 2.0, Alpine.js 3.x, xterm.js |
-| Design | Kaze design system — Geist Sans, Geist Mono |
+| Design | Kaze design system — Recursive variable font |
 | Assets | `go:embed` — single binary, ~10MB |
 | Icons | Lucide v0.469.0 (self-hosted SVG sprite) |
 | Metrics | `/proc/stat`, `/proc/meminfo`, `syscall.Statfs`, `docker stats` |
@@ -335,7 +334,7 @@ go test ./...
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=getkaze/keel&type=Date)](https://star-history.com/#getkaze/keel&Date)
+[![Star History Chart](https://api.star-history.com/image?repos=getkaze/keel&type=date&legend=top-left)](https://www.star-history.com/?repos=getkaze%2Fkeel&type=date&legend=top-left)
 
 ---
 

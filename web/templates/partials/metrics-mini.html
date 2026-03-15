@@ -1,7 +1,7 @@
 {{define "metrics-mini"}}
-<span class="font-mono" title="CPU" style="color:var(--color-text-muted)">CPU <span style="color:var(--color-primary)">{{printf "%.0f" .CPU.UsagePercent}}%</span></span>
-<span style="color:var(--color-border)">|</span>
-<span class="font-mono" title="RAM" style="color:var(--color-text-muted)">RAM <span style="color:var(--color-primary)">{{printf "%.0f" .Memory.UsagePercent}}%</span></span>
-<span style="color:var(--color-border)">|</span>
-<span class="font-mono" title="Disk" style="color:var(--color-text-muted)">Disk <span style="color:var(--color-primary)">{{printf "%.0f" .Disk.UsagePercent}}%</span></span>
+<span class="font-mono" style="color:var(--muted)">cpu <span class="val" style="color:var(--accent)">{{printf "%.0f" .CPU.UsagePercent}}%</span></span>
+<span class="sep" style="color:var(--border2)">·</span>
+<span class="font-mono" style="color:var(--muted)">ram <span class="val" style="color:var(--accent)">{{printf "%.0f" .Memory.UsagePercent}}%</span></span>
+<span class="sep" style="color:var(--border2)">·</span>
+<span class="font-mono" style="color:var(--muted)">disk <span class="val" style="color:var(--accent)">{{printf "%.0f" .Disk.UsagePercent}}%</span></span>
 {{end}}

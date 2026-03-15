@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/getkaze/keel/internal/config"
 	"github.com/getkaze/keel/internal/terminal"
 )
 
@@ -36,17 +37,27 @@ func (h *TerminalHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // ExecTerminalHandler handles GET /ws/terminal/exec/{name} — docker exec PTY bridge.
-type ExecTerminalHandler struct{}
+type ExecTerminalHandler struct {
+	Services *config.ServiceStore
+}
 
 func (h *ExecTerminalHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	container := r.PathValue("name")
-	if container == "" {
+	name := r.PathValue("name")
+	if name == "" {
 		http.Error(w, "container name required", http.StatusBadRequest)
 		return
 	}
 
+	// Resolve the actual Docker container name from the service config
+	container := "keel-" + name // fallback
+	if h.Services != nil {
+		if svc, err := h.Services.Get(name); err == nil && svc != nil && svc.Hostname != "" {
+			container = svc.Hostname
+		}
+	}
+
 	serveTerminalWS(w, r, func() (*terminal.Session, error) {
-		return terminal.NewExecSession("keel-" + container)
+		return terminal.NewExecSession(container)
 	})
 }
 

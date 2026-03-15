@@ -1,0 +1,18 @@
+{{define "service-metrics"}}
+<div class="metric-cell">
+    <span class="metric-label">cpu</span>
+    <span class="metric-value">{{if .CPUPerc}}{{.CPUPerc}}{{else}}—{{end}}</span>
+</div>
+<div class="metric-cell">
+    <span class="metric-label">mem</span>
+    <span class="metric-value">{{if .MemPerc}}{{.MemPerc}}{{else}}—{{end}}</span>
+</div>
+<div class="metric-cell">
+    <span class="metric-label">net</span>
+    <span class="metric-value">{{if .NetIO}}{{.NetIO}}{{else}}—{{end}}</span>
+</div>
+<div class="metric-cell">
+    <span class="metric-label">io</span>
+    <span class="metric-value">{{if .BlockIO}}{{.BlockIO}}{{else}}—{{end}}</span>
+</div>
+{{end}}

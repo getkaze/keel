@@ -1,70 +1,74 @@
 {{define "seeders"}}
 <div id="seeders-page">
-    <div class="flex items-center justify-between" style="margin-bottom:var(--space-3)">
-        <h2 style="margin:0">SEEDERS</h2>
-        <button class="sm" id="run-all-seeders-btn"
-                onclick="runAllSeeders(this)"
-                style="display:inline-flex;align-items:center;gap:0.375rem">
-            <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
-            <span>RUN SEEDERS</span>
-        </button>
+    <!-- Page header -->
+    <div class="page-header">
+        <span class="page-title">Seeders</span>
+        <span class="page-subtitle">database initialization</span>
+        <div class="page-actions">
+            <button class="btn btn-primary sm" id="run-all-seeders-btn"
+                    onclick="runAllSeeders(this)">
+                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
+                <span>Run seeders</span>
+            </button>
+        </div>
     </div>
 
-    {{if not .Groups}}
-    <div class="empty-state">
-        <svg class="empty-state-icon" viewBox="0 0 24 24"><use href="/static/lucide-sprite.svg#database"></use></svg>
-        <span class="empty-state-title">No seeders configured</span>
-        <span class="empty-state-hint">Add JSON files to <code>data/seeders/</code> to define initialization commands</span>
-    </div>
-    {{else}}
-    <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+    <div style="padding:20px 24px">
+        {{if not .Groups}}
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24"><use href="/static/lucide-sprite.svg#database"></use></svg>
+            <span class="empty-state-title">No seeders configured</span>
+            <span class="empty-state-hint">Add JSON files to <code style="color:var(--accent)">data/seeders/</code> to define initialization commands</span>
+        </div>
+        {{else}}
         {{range .Groups}}
-        <div>
-            <div class="flex items-center gap-2" style="margin-bottom:var(--space-2)">
-                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#server"></use></svg>
-                <span style="font-weight:600;font-size:var(--font-size-sm);text-transform:uppercase;letter-spacing:0.05em">{{.Target}}</span>
-                <span class="status-dot status-{{.TargetStatus}}"></span>
+        <div style="margin-bottom:20px">
+            <div class="group-label">
+                <span class="dot" style="width:5px;height:5px;background:var(--green);box-shadow:0 0 4px var(--green)"></span>
+                {{.Target}}
             </div>
-            <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+            <div class="seeder-list">
                 {{range .Seeders}}
-                <div class="card seeder-card seeder-idle" id="seeder-card-{{.Name}}"
-                     data-last-status="{{.LastStatus}}"
-                     style="padding:var(--space-3)">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <svg class="icon-sm" style="color:var(--color-text-muted)"><use href="/static/lucide-sprite.svg#database"></use></svg>
-                            <span style="font-weight:600">{{.Name}}</span>
-                            {{if .Description}}
-                            <span style="color:var(--color-text-muted);font-size:var(--font-size-sm)">&mdash; {{.Description}}</span>
-                            {{end}}
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span style="font-size:var(--font-size-sm);color:var(--color-text-muted)">{{.CommandCount}} cmd{{if ne .CommandCount 1}}s{{end}}</span>
-                            <span class="badge badge-ghost seeder-status" id="seeder-status-{{.Name}}">IDLE</span>
-                            <button class="ghost sm" onclick="event.stopPropagation();runOneSeeder(this,'{{.Name}}')"
-                                    style="display:inline-flex;align-items:center;gap:0.25rem">
-                                <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
-                                <span>Run</span>
-                            </button>
-                            <button class="ghost sm" id="seeder-toggle-{{.Name}}"
-                                    onclick="event.stopPropagation();toggleSeederLog('{{.Name}}')"
-                                    style="display:none;padding:0.25rem 0.375rem;line-height:1">
-                                <svg class="icon-sm seeder-chevron" style="transform:rotate(-90deg);transition:transform 0.15s">
-                                    <use href="/static/lucide-sprite.svg#chevron-left"></use>
-                                </svg>
-                            </button>
-                        </div>
+                <div class="seeder-item" id="seeder-card-{{.Name}}" data-last-status="{{.LastStatus}}">
+                    <div class="seeder-info">
+                        <div class="seeder-name">{{.Name}}</div>
+                        {{if .Description}}
+                        <div class="seeder-desc">{{.Description}}</div>
+                        {{end}}
                     </div>
-                    <div class="hidden" id="seeder-log-{{.Name}}" style="margin-top:var(--space-2);border-top:1px solid var(--color-border);padding-top:var(--space-2)">
-                        <div id="seeder-log-output-{{.Name}}" class="log-output"
-                             style="max-height:300px;overflow-y:auto;font-family:var(--font-mono);font-size:var(--font-size-sm)"></div>
-                    </div>
+                    <span class="seeder-target">{{.CommandCount}} cmd{{if ne .CommandCount 1}}s{{end}}</span>
+                    {{if .LastRanAt}}
+                    <span class="seeder-status {{if eq .LastStatus "success"}}success{{else if eq .LastStatus "error"}}error{{else}}pending{{end}}" id="seeder-status-{{.Name}}">
+                        {{if eq .LastStatus "success"}}done{{else if eq .LastStatus "error"}}error{{else}}idle{{end}}
+                    </span>
+                    <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">{{.LastRanAt}}</span>
+                    {{else}}
+                    <span class="seeder-status pending" id="seeder-status-{{.Name}}">idle</span>
+                    {{end}}
+                    <button class="action-btn" onclick="event.stopPropagation();runOneSeeder(this,'{{.Name}}')">
+                        <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
+                        run
+                    </button>
+                    <button class="action-btn" id="seeder-toggle-{{.Name}}"
+                            onclick="event.stopPropagation();toggleSeederLog('{{.Name}}')"
+                            style="display:none;padding:3px">
+                        <svg class="icon-sm seeder-chevron" style="transform:rotate(-90deg);transition:transform 0.15s">
+                            <use href="/static/lucide-sprite.svg#chevron-left"></use>
+                        </svg>
+                    </button>
                 </div>
                 {{end}}
             </div>
+            <!-- Log outputs (hidden by default) -->
+            {{range .Seeders}}
+            <div class="hidden" id="seeder-log-{{.Name}}" style="margin-top:-1px">
+                <div id="seeder-log-output-{{.Name}}" class="logs-output"
+                     style="max-height:300px;overflow-y:auto;border-radius:0 0 6px 6px;margin-top:0;border-top:none"></div>
+            </div>
+            {{end}}
         </div>
         {{end}}
+        {{end}}
     </div>
-    {{end}}
 </div>
 {{end}}

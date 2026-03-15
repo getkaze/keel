@@ -1,51 +1,73 @@
 {{define "service-grid"}}
 <div id="services-grid"
      hx-get="/partials/overview" hx-trigger="refreshServices from:body" hx-swap="outerHTML">
+
     {{if .Services}}
-    <div class="flex items-center justify-between" style="margin-bottom:var(--space-3)">
-        <h2 style="margin:0">OVERVIEW</h2>
-        <div class="flex items-center gap-2">
+    <!-- Page header -->
+    <div class="page-header">
+        <span class="page-title">Dashboard</span>
+        <span class="page-subtitle">{{len .Services}} containers</span>
+        <div class="page-actions">
             {{if .HasStopped}}
-            <button class="sm"
-                    onclick="this.disabled=true;this.querySelector('span').textContent='STARTING...';startSSE('/api/services/start-all',{successMessage:'All services started'});"
-                    style="display:inline-flex;align-items:center;gap:0.375rem">
+            <button class="btn btn-primary sm"
+                    onclick="this.disabled=true;this.querySelector('span').textContent='starting...';startSSE('/api/services/start-all',{successMessage:'All services started'});">
                 <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
-                <span>START ALL</span>
+                <span>Start all</span>
             </button>
             {{end}}
             {{if .HasRunning}}
-            <button class="ghost sm"
-                    onclick="if(!confirm('Stop all running containers?'))return;this.disabled=true;this.querySelector('span').textContent='STOPPING...';startSSE('/api/services/stop-all',{successMessage:'All services stopped'});"
-                    style="display:inline-flex;align-items:center;gap:0.375rem">
+            <button class="btn btn-ghost sm"
+                    onclick="if(!confirm('Stop all running containers?'))return;this.disabled=true;this.querySelector('span').textContent='stopping...';startSSE('/api/services/stop-all',{successMessage:'All services stopped'});">
                 <svg class="icon-sm"><use href="/static/lucide-sprite.svg#square"></use></svg>
-                <span>STOP ALL</span>
+                <span>Stop all</span>
             </button>
             {{end}}
         </div>
     </div>
-    <div class="service-groups">
-        {{range .Groups}}
-        <div class="service-group">
-            <div class="service-group-header">
-                <span class="service-group-label">{{.Name}}</span>
-                <span class="service-group-count">{{len .Services}}</span>
-            </div>
-            <div class="grid-cards">
-                {{range .Services}}
-                {{template "service-card" .}}
-                {{end}}
-            </div>
+
+    <div style="padding:20px 24px" x-data="{ filter: 'all' }" x-effect="
+        /* Show/hide cards and groups based on filter */
+        $el.querySelectorAll('.container-card').forEach(c => {
+            const s = c.dataset.status;
+            const match = filter === 'all' || s === filter || (filter === 'stopped' && s !== 'running' && s !== 'unhealthy' && s !== 'restarting');
+            c.style.display = match ? '' : 'none';
+        });
+        $el.querySelectorAll('.service-group').forEach(g => {
+            const hasVisible = g.querySelector('.container-card:not([style*=&quot;display: none&quot;])');
+            g.style.display = hasVisible ? '' : 'none';
+        });
+    ">
+        <!-- Filter bar -->
+        <div class="filter-bar">
+            <button class="filter-chip" :class="filter === 'all' ? 'active' : ''" @click="filter = 'all'">All</button>
+            <button class="filter-chip" :class="filter === 'running' ? 'active' : ''" @click="filter = 'running'">Running</button>
+            <button class="filter-chip" :class="filter === 'restarting' ? 'active' : ''" @click="filter = 'restarting'">Restarting</button>
+            <button class="filter-chip" :class="filter === 'stopped' ? 'active' : ''" @click="filter = 'stopped'">Stopped</button>
         </div>
-        {{end}}
+
+        <!-- Service groups -->
+        <div class="service-groups">
+            {{range .Groups}}
+            <div class="service-group">
+                <div class="group-label">{{.Name}}</div>
+                <div class="container-grid">
+                    {{range .Services}}
+                    {{template "service-card" .}}
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </div>
     </div>
+
     {{else}}
-    <div class="empty-state">
+    <div class="empty-state" style="height:calc(100vh - 160px)">
         <svg class="empty-state-icon" viewBox="0 0 24 24"><use href="/static/lucide-sprite.svg#box"></use></svg>
         <span class="empty-state-title">No containers yet</span>
         <span class="empty-state-hint">
             Click <a href="/services/new"
                      hx-get="/partials/service-new" hx-target="#main-content" hx-push-url="/services/new"
-                     style="color:var(--color-primary)">+ NEW CONTAINER</a> to get started
+                     style="color:var(--accent)">+ New container</a> to get started
         </span>
     </div>
     {{end}}

@@ -77,8 +77,9 @@ type LogSource struct {
 type ContainerStatus string
 
 const (
-	StatusRunning   ContainerStatus = "running"
-	StatusStopped   ContainerStatus = "stopped"
-	StatusUnhealthy ContainerStatus = "unhealthy"
-	StatusMissing   ContainerStatus = "missing"
+	StatusRunning    ContainerStatus = "running"
+	StatusRestarting ContainerStatus = "restarting"
+	StatusStopped    ContainerStatus = "stopped"
+	StatusUnhealthy  ContainerStatus = "unhealthy"
+	StatusMissing    ContainerStatus = "missing"
 )

@@ -77,15 +77,15 @@ jobs:
           body: |
             ## keel ${{ github.ref_name }}
 
-            ### Instalação
+            ### Installation
 
             ```bash
             curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash
             ```
 
-            ### Download manual
+            ### Manual download
 
-            | Plataforma | Link |
+            | Platform | Link |
             |---|---|
             | Linux amd64  | [keel-linux-amd64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-linux-amd64) |
             | Linux arm64  | [keel-linux-arm64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-linux-arm64) |

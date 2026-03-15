@@ -18,6 +18,7 @@ type PageDeps struct {
 	Services       *config.ServiceStore
 	Seeders        *config.SeederStore
 	Docker         *docker.StatusPoller
+	Stats          *metrics.StatsPoller
 	Tmpl           *template.Template
 	Version        string
 	Remote         *metrics.RemoteCollector // nil for local targets
@@ -208,7 +209,7 @@ func (d *PageDeps) metricsPartial(w http.ResponseWriter, r *http.Request) {
 		}()
 		go func() {
 			defer wg.Done()
-			containers, _ = metrics.ReadDockerStats(r.Context())
+			containers, _ = d.Stats.ReadStats(r.Context())
 		}()
 	} else {
 		wg.Add(4)
@@ -236,7 +237,7 @@ func (d *PageDeps) metricsPartial(w http.ResponseWriter, r *http.Request) {
 		}()
 		go func() {
 			defer wg.Done()
-			containers, _ = metrics.ReadDockerStats(r.Context())
+			containers, _ = d.Stats.ReadStats(r.Context())
 		}()
 	}
 	wg.Wait()
@@ -312,6 +313,9 @@ func (d *PageDeps) seedersPartial(w http.ResponseWriter, r *http.Request) {
 			}
 			if d.SeederExecutor != nil {
 				sv.LastStatus = d.SeederExecutor.GetLastStatus(sd.Name)
+				if t := d.SeederExecutor.GetLastRanAt(sd.Name); !t.IsZero() {
+					sv.LastRanAt = t.Format("2006-01-02 15:04")
+				}
 			}
 			g, ok := groupMap[sd.Target]
 			if !ok {

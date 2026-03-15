@@ -3,6 +3,7 @@ package docker
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,6 +33,12 @@ func (localCmdBuilder) DockerCmd(ctx context.Context, args ...string) *exec.Cmd 
 	return exec.CommandContext(ctx, "docker", args...)
 }
 
+// SeederStateEntry persists per-seeder execution info to disk.
+type SeederStateEntry struct {
+	Status  string    `json:"status"`
+	RanAt   time.Time `json:"ran_at"`
+}
+
 // SeederExecutor runs seeder commands against infrastructure containers.
 type SeederExecutor struct {
 	Services   *config.ServiceStore
@@ -39,36 +46,110 @@ type SeederExecutor struct {
 	KeelDir    string
 	Cmd        CmdBuilder
 	statusMu   sync.RWMutex
-	lastStatus map[string]string
+	lastStatus map[string]SeederStateEntry
 }
 
 // NewSeederExecutor creates a SeederExecutor.
 func NewSeederExecutor(keelDir string, services *config.ServiceStore, seeders *config.SeederStore) *SeederExecutor {
-	return &SeederExecutor{
+	se := &SeederExecutor{
 		Services:   services,
 		Seeders:    seeders,
 		KeelDir:    keelDir,
 		Cmd:        localCmdBuilder{},
-		lastStatus: make(map[string]string),
+		lastStatus: make(map[string]SeederStateEntry),
 	}
+	se.loadState()
+	return se
 }
 
 // NewSeederExecutorWithCmd creates a SeederExecutor with a custom command builder.
 func NewSeederExecutorWithCmd(keelDir string, services *config.ServiceStore, seeders *config.SeederStore, cmd CmdBuilder) *SeederExecutor {
-	return &SeederExecutor{
+	se := &SeederExecutor{
 		Services:   services,
 		Seeders:    seeders,
 		KeelDir:    keelDir,
 		Cmd:        cmd,
-		lastStatus: make(map[string]string),
+		lastStatus: make(map[string]SeederStateEntry),
 	}
+	se.loadState()
+	return se
+}
+
+func (se *SeederExecutor) stateFile() string {
+	return filepath.Join(se.KeelDir, "data", "seeder-state.json")
+}
+
+func (se *SeederExecutor) loadState() {
+	data, err := os.ReadFile(se.stateFile())
+	if err != nil {
+		return
+	}
+	var state map[string]SeederStateEntry
+	if json.Unmarshal(data, &state) == nil && state != nil {
+		se.lastStatus = state
+	}
+}
+
+func (se *SeederExecutor) saveState() {
+	data, err := json.MarshalIndent(se.lastStatus, "", "  ")
+	if err != nil {
+		return
+	}
+	os.MkdirAll(filepath.Dir(se.stateFile()), 0755)
+	os.WriteFile(se.stateFile(), data, 0644)
 }
 
 // GetLastStatus returns the last known run status ("success" or "error") for a seeder.
 func (se *SeederExecutor) GetLastStatus(name string) string {
 	se.statusMu.RLock()
 	defer se.statusMu.RUnlock()
-	return se.lastStatus[name]
+	return se.lastStatus[name].Status
+}
+
+// GetLastRanAt returns when the seeder last ran.
+func (se *SeederExecutor) GetLastRanAt(name string) time.Time {
+	se.statusMu.RLock()
+	defer se.statusMu.RUnlock()
+	return se.lastStatus[name].RanAt
+}
+
+// ReloadState re-reads seeder state from disk, picking up changes from CLI.
+func (se *SeederExecutor) ReloadState() {
+	se.statusMu.Lock()
+	defer se.statusMu.Unlock()
+	se.loadState()
+}
+
+// ClearForService removes state for all seeders that target the given service.
+func (se *SeederExecutor) ClearForService(serviceName string) {
+	seeders, err := se.Seeders.List()
+	if err != nil {
+		return
+	}
+
+	se.statusMu.Lock()
+	defer se.statusMu.Unlock()
+
+	changed := false
+	for _, sd := range seeders {
+		if sd.Target == serviceName {
+			if _, ok := se.lastStatus[sd.Name]; ok {
+				delete(se.lastStatus, sd.Name)
+				changed = true
+			}
+		}
+	}
+	if changed {
+		se.saveState()
+	}
+}
+
+// ClearAll removes all seeder state.
+func (se *SeederExecutor) ClearAll() {
+	se.statusMu.Lock()
+	defer se.statusMu.Unlock()
+	se.lastStatus = make(map[string]SeederStateEntry)
+	se.saveState()
 }
 
 // RunAll runs all seeders in alphabetical order, stopping on first error.
@@ -97,7 +178,11 @@ func (se *SeederExecutor) RunOne(ctx context.Context, out chan<- string, seeder 
 			status = "error"
 		}
 		se.statusMu.Lock()
-		se.lastStatus[seeder.Name] = status
+		se.lastStatus[seeder.Name] = SeederStateEntry{
+			Status: status,
+			RanAt:  time.Now(),
+		}
+		se.saveState()
 		se.statusMu.Unlock()
 	}()
 	// Resolve target hostname
@@ -245,6 +330,60 @@ func (se *SeederExecutor) isRunning(ctx context.Context, hostname string) bool {
 		"--format", "{{.Names}}",
 	).Output()
 	return strings.TrimSpace(string(out)) == hostname
+}
+
+// ClearSeederStateForService is a standalone function that clears seeder state
+// for all seeders targeting the given service, without needing a full executor.
+// Used by the CLI reset command.
+func ClearSeederStateForService(keelDir string, serviceName string) {
+	stateFile := filepath.Join(keelDir, "data", "seeder-state.json")
+	seederDir := filepath.Join(keelDir, "data", "seeders")
+
+	// Load seeder definitions to find which ones target this service
+	seeders := config.NewSeederStore(keelDir)
+	allSeeders, err := seeders.List()
+	if err != nil || len(allSeeders) == 0 {
+		return
+	}
+
+	// Find seeder names targeting this service
+	var targets []string
+	for _, sd := range allSeeders {
+		if sd.Target == serviceName {
+			targets = append(targets, sd.Name)
+		}
+	}
+	if len(targets) == 0 {
+		return
+	}
+
+	// Load state file
+	data, err := os.ReadFile(stateFile)
+	if err != nil {
+		return
+	}
+	var state map[string]SeederStateEntry
+	if json.Unmarshal(data, &state) != nil || state == nil {
+		return
+	}
+
+	// Remove entries
+	changed := false
+	for _, name := range targets {
+		if _, ok := state[name]; ok {
+			delete(state, name)
+			changed = true
+		}
+	}
+
+	if changed {
+		if out, err := json.MarshalIndent(state, "", "  "); err == nil {
+			os.MkdirAll(filepath.Dir(stateFile), 0755)
+			os.WriteFile(stateFile, out, 0644)
+		}
+	}
+
+	_ = seederDir // suppress unused
 }
 
 func formatDuration(d time.Duration) string {
