@@ -138,10 +138,10 @@ function terminalPanel() {
             };
 
             var systemMono = "'DejaVu Sans Mono', 'Liberation Mono', 'Noto Sans Mono', 'Fira Code', monospace";
-            var preferredFont = "'JetBrains Mono', " + systemMono;
+            var preferredFont = "'RecursiveMono', " + systemMono;
 
             if (document.fonts && document.fonts.load) {
-                document.fonts.load('13px "JetBrains Mono"').then(function(loaded) {
+                document.fonts.load('13px "RecursiveMono"').then(function(loaded) {
                     if (loaded && loaded.length > 0) {
                         openWithFont(preferredFont);
                     } else {

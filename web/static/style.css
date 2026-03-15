@@ -1,8 +1,40 @@
 /* keel Dashboard — Design System v2
    Aligned with keel-dashboard.html reference design
-   Geist + Geist Mono | Dark & Light themes */
+   Recursive variable font | Dark & Light themes */
 
-/* Fonts loaded via Google Fonts: Inter + JetBrains Mono */
+/* Fonts loaded via Google Fonts: Recursive (variable) */
+
+/* Recursive Mono — static instances with MONO=1 baked in */
+@font-face {
+    font-family: 'RecursiveMono';
+    src: url(https://fonts.gstatic.com/s/recursive/v44/8vJN7wMr0mhh-RQChyHEH06TlXhq_gukbYrFMk1QuAIcyEwG_X-dpEfaE5YaERmK-CImqvTxvU-MXGX2fSqasNfUvz2xbXfn1uEQadDck018.ttf) format('truetype');
+    font-weight: 300;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'RecursiveMono';
+    src: url(https://fonts.gstatic.com/s/recursive/v44/8vJN7wMr0mhh-RQChyHEH06TlXhq_gukbYrFMk1QuAIcyEwG_X-dpEfaE5YaERmK-CImqvTxvU-MXGX2fSqasNfUvz2xbXfn1uEQadCCk018.ttf) format('truetype');
+    font-weight: 400;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'RecursiveMono';
+    src: url(https://fonts.gstatic.com/s/recursive/v44/8vJN7wMr0mhh-RQChyHEH06TlXhq_gukbYrFMk1QuAIcyEwG_X-dpEfaE5YaERmK-CImqvTxvU-MXGX2fSqasNfUvz2xbXfn1uEQadCwk018.ttf) format('truetype');
+    font-weight: 500;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'RecursiveMono';
+    src: url(https://fonts.gstatic.com/s/recursive/v44/8vJN7wMr0mhh-RQChyHEH06TlXhq_gukbYrFMk1QuAIcyEwG_X-dpEfaE5YaERmK-CImqvTxvU-MXGX2fSqasNfUvz2xbXfn1uEQadBclE18.ttf) format('truetype');
+    font-weight: 600;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'RecursiveMono';
+    src: url(https://fonts.gstatic.com/s/recursive/v44/8vJN7wMr0mhh-RQChyHEH06TlXhq_gukbYrFMk1QuAIcyEwG_X-dpEfaE5YaERmK-CImqvTxvU-MXGX2fSqasNfUvz2xbXfn1uEQadBllE18.ttf) format('truetype');
+    font-weight: 700;
+    font-display: swap;
+}
 
 /* ══════════════════════════════════════════
    1. TOKENS
@@ -23,8 +55,8 @@
     --yellow:   #eab308;
     --red:      #ef4444;
     --blue:     #3b82f6;
-    --mono:     'JetBrains Mono', monospace;
-    --sans:     'Inter', sans-serif;
+    --mono:     'RecursiveMono', monospace;
+    --sans:     'Recursive', sans-serif;
     --sidebar-w: 220px;
     --topbar-h:  48px;
 
@@ -83,6 +115,7 @@ body {
     background: var(--bg);
     color: var(--text);
     font-family: var(--sans);
+    font-variation-settings: 'MONO' 0, 'CASL' 0;
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
     display: flex;
@@ -2444,6 +2477,34 @@ dialog footer {
    ══════════════════════════════════════════ */
 
 @media (max-width: 768px) {
+    /* Layout */
+    .sidebar { display: none; }
+    .topbar { padding: 0 12px; gap: 8px; }
+    .topbar-metrics { display: none; }
+    .topbar-wordmark { display: none; }
+
+    .page-header { padding: 12px 16px 10px; }
+    .page-body { padding: 16px; }
+    .page-title { font-size: 20px; }
+
+    /* Container grid — single column */
+    .container-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Container table — horizontal scroll */
+    .container-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Metrics panel — single column */
+    .metrics-panel {
+        grid-template-columns: 1fr;
+    }
+
+    /* Detail view */
     .detail-header {
         flex-direction: column;
         align-items: flex-start;
@@ -2454,6 +2515,11 @@ dialog footer {
         justify-content: flex-start;
     }
 
+    .detail-info-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+
+    /* Log toolbar */
     .log-toolbar {
         flex-direction: column;
         align-items: stretch;
@@ -2473,8 +2539,48 @@ dialog footer {
         justify-content: flex-start;
     }
 
-    .sidebar { display: none; }
-    .topbar { padding: 0 12px; }
+    /* Terminal/operation panels — full width */
+    .terminal-panel,
+    .operation-panel,
+    .terminal-panel.sidebar-expanded,
+    .terminal-panel.sidebar-collapsed,
+    .operation-panel.sidebar-expanded,
+    .operation-panel.sidebar-collapsed {
+        left: 0;
+    }
+
+    /* Metric big values */
+    .metric-big-value { font-size: 22px; }
+    .metrics-card-value { font-size: 20px; }
+}
+
+@media (max-width: 480px) {
+    .topbar-right { gap: 2px; }
+    .topbar-btn span { display: none; }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .page-actions {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .container-grid {
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+
+    .detail-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .container-card { padding: 12px; }
+    .page-body { padding: 12px; }
 }
 
 /* ══════════════════════════════════════════
