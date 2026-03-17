@@ -2195,6 +2195,145 @@ dialog footer {
     gap: 8px;
 }
 
+/* Update modal */
+#update-modal {
+    max-width: 40rem;
+    width: 90%;
+    padding: 0;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+}
+
+.update-modal-content {
+    margin: 0;
+}
+
+.update-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 24px 28px 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.update-modal-header h3 {
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.update-modal-changelog {
+    padding: 20px 28px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--muted2);
+}
+
+.update-modal-changelog .changelog-section {
+    margin-bottom: 16px;
+}
+
+.update-modal-changelog .changelog-section:last-child {
+    margin-bottom: 0;
+}
+
+.update-modal-changelog .changelog-heading {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted2);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.changelog-icon {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}
+
+.changelog-icon-added   { color: var(--green); }
+.changelog-icon-changed { color: var(--accent); }
+.changelog-icon-fixed   { color: var(--green); }
+.changelog-icon-removed { color: var(--red); }
+
+.update-modal-changelog .changelog-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.update-modal-changelog .changelog-list li {
+    position: relative;
+    padding-left: 16px;
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.update-modal-changelog .changelog-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 9px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--muted);
+}
+
+.update-modal-changelog .changelog-text {
+    margin: 0 0 8px;
+}
+
+.update-modal-progress {
+    padding: 16px 24px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted2);
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.update-modal-footer {
+    padding: 18px 28px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.spinner-sm {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* ══════════════════════════════════════════
    25. TOOLTIP
    ══════════════════════════════════════════ */
@@ -2435,7 +2574,9 @@ dialog footer {
 .text-primary { color: var(--accent); }
 .text-success { color: var(--green); }
 .text-error   { color: var(--red); }
+.text-warning { color: var(--yellow); }
 .text-muted   { color: var(--muted); }
+.text-accent  { color: var(--accent); }
 .border-b { border-bottom: 1px solid var(--border); }
 .border-t { border-top: 1px solid var(--border); }
 .overflow-auto  { overflow-y: auto; }

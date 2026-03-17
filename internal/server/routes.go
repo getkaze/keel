@@ -155,6 +155,7 @@ func registerRoutes(mux *http.ServeMux, cfg Config) {
 	}
 	mux.Handle("GET /api/metrics", metricsHandler)
 	mux.Handle("GET /api/version", &handler.VersionHandler{Version: cfg.Version})
+	mux.Handle("POST /api/update", &handler.UpdateHandler{Version: cfg.Version})
 
 	// Page partials (HTMX)
 	handler.RegisterPageRoutes(mux, &handler.PageDeps{

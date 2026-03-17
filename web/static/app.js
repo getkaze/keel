@@ -7,7 +7,10 @@ if ('serviceWorker' in navigator) {
 }
 
 // Version check: show update indicator if new version available
+var _versionData = null;
+
 fetch('/api/version').then(function(r) { return r.json(); }).then(function(data) {
+    _versionData = data;
     if (data.available) {
         var el = document.getElementById('update-indicator');
         var ver = document.getElementById('update-version');
@@ -17,6 +20,201 @@ fetch('/api/version').then(function(r) { return r.json(); }).then(function(data)
         }
     }
 }).catch(function() {});
+
+// Update modal
+function openUpdateModal() {
+    var modal = document.getElementById('update-modal');
+    if (!modal || !_versionData) return;
+
+    document.getElementById('update-modal-current').textContent = _versionData.current;
+    document.getElementById('update-modal-latest').textContent = _versionData.latest;
+
+    // Render changelog
+    var changelogEl = document.getElementById('update-modal-changelog');
+    if (_versionData.changelog) {
+        changelogEl.innerHTML = renderMarkdown(_versionData.changelog);
+    } else {
+        changelogEl.innerHTML = '<p class="text-muted">No release notes available.</p>';
+    }
+
+    // Reset state
+    document.getElementById('update-modal-progress').style.display = 'none';
+    document.getElementById('update-modal-progress').innerHTML = '';
+    document.getElementById('update-modal-btn').disabled = false;
+    document.getElementById('update-modal-btn').style.display = '';
+    document.getElementById('update-modal-cancel').style.display = '';
+
+    modal.showModal();
+}
+
+function performUpdate() {
+    var btn = document.getElementById('update-modal-btn');
+    var progress = document.getElementById('update-modal-progress');
+    var changelog = document.getElementById('update-modal-changelog');
+    var cancelBtn = document.getElementById('update-modal-cancel');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-sm"></span> Updating...';
+    cancelBtn.style.display = 'none';
+    changelog.style.display = 'none';
+    progress.style.display = '';
+
+    fetchSSEUpdate(progress, btn, cancelBtn);
+}
+
+function fetchSSEUpdate(progress, btn, cancelBtn) {
+    fetch('/api/update', { method: 'POST' }).then(function(response) {
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function read() {
+            reader.read().then(function(result) {
+                if (result.done) return;
+                buffer += decoder.decode(result.value, { stream: true });
+                var lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (var i = 0; i < lines.length; i++) {
+                    processSSELine(lines[i], progress, btn, cancelBtn);
+                }
+                read();
+            });
+        }
+        read();
+    }).catch(function(err) {
+        var line = document.createElement('div');
+        line.className = 'text-error font-semibold';
+        line.textContent = 'Connection failed: ' + err.message;
+        progress.appendChild(line);
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-right:4px"><use href="/static/lucide-sprite.svg#download"></use></svg> Retry';
+        cancelBtn.style.display = '';
+    });
+}
+
+var _sseEventType = '';
+
+function processSSELine(line, progress, btn, cancelBtn) {
+    if (line.indexOf('event: ') === 0) {
+        _sseEventType = line.substring(7).trim();
+        return;
+    }
+    if (line.indexOf('data: ') !== 0) {
+        if (line === '') _sseEventType = '';
+        return;
+    }
+    var data = line.substring(6);
+    var eventType = _sseEventType;
+    _sseEventType = '';
+
+    var el = document.createElement('div');
+
+    if (eventType === 'done') {
+        el.className = 'text-success font-semibold';
+        el.textContent = data;
+        progress.appendChild(el);
+        btn.style.display = 'none';
+
+        var reloadLine = document.createElement('div');
+        reloadLine.className = 'text-muted mt-1';
+        reloadLine.textContent = 'Restarting keel... reloading in a few seconds.';
+        progress.appendChild(reloadLine);
+        setTimeout(function() { waitForRestart(); }, 2000);
+    } else if (eventType === 'error') {
+        el.className = 'text-error font-semibold';
+        el.textContent = data;
+        progress.appendChild(el);
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-right:4px"><use href="/static/lucide-sprite.svg#download"></use></svg> Retry';
+        cancelBtn.style.display = '';
+    } else {
+        el.textContent = data;
+        progress.appendChild(el);
+    }
+    progress.scrollTop = progress.scrollHeight;
+}
+
+function waitForRestart() {
+    var attempts = 0;
+    var maxAttempts = 30;
+    function tryReload() {
+        attempts++;
+        fetch('/api/health').then(function(r) {
+            if (r.ok) {
+                window.location.reload();
+            } else {
+                retry();
+            }
+        }).catch(function() {
+            retry();
+        });
+    }
+    function retry() {
+        if (attempts < maxAttempts) {
+            setTimeout(tryReload, 1000);
+        } else {
+            var progress = document.getElementById('update-modal-progress');
+            if (progress) {
+                var el = document.createElement('div');
+                el.className = 'text-warning';
+                el.textContent = 'Could not reconnect. Please reload the page manually.';
+                progress.appendChild(el);
+            }
+        }
+    }
+    tryReload();
+}
+
+// Changelog markdown renderer with category icons
+var changelogIcons = {
+    "added":   '<svg class="changelog-icon changelog-icon-added" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    "changed": '<svg class="changelog-icon changelog-icon-changed" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+    "fixed":   '<svg class="changelog-icon changelog-icon-fixed" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    "removed": '<svg class="changelog-icon changelog-icon-removed" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    "what's new": '<svg class="changelog-icon changelog-icon-added" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
+};
+
+function renderMarkdown(text) {
+    var lines = text.split('\n');
+    var html = '';
+    var inList = false;
+    var inSection = false;
+
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+
+        if (/^#{2,3}\s+/.test(line)) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inSection) { html += '</div>'; inSection = false; }
+
+            var heading = line.replace(/^#{2,3}\s+/, '').trim();
+            var key = heading.toLowerCase();
+            var icon = changelogIcons[key] || '';
+
+            html += '<div class="changelog-section">';
+            html += '<h4 class="changelog-heading">' + icon + escapeHtml(heading) + '</h4>';
+            inSection = true;
+        } else if (/^[-*]\s+/.test(line)) {
+            if (!inList) { html += '<ul class="changelog-list">'; inList = true; }
+            var content = line.replace(/^[-*]\s+/, '');
+            // Bold text between ** **
+            var rendered = escapeHtml(content).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html += '<li>' + rendered + '</li>';
+        } else if (line.trim() === '') {
+            if (inList) { html += '</ul>'; inList = false; }
+        } else if (line.trim()) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += '<p class="changelog-text">' + escapeHtml(line) + '</p>';
+        }
+    }
+    if (inList) html += '</ul>';
+    if (inSection) html += '</div>';
+
+    if (!html.trim()) {
+        html = '<p class="text-muted">No release notes available.</p>';
+    }
+    return html;
+}
 
 // AnsiUp instance for ANSI color rendering
 let ansiUp = null;
