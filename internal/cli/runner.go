@@ -170,7 +170,7 @@ func (r *Runner) syncFiles(ctx context.Context, svc model.Service, keelDir strin
 		}
 
 		// Build scp args with the same SSH options (key, jump host).
-		scpArgs := []string{"-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes", "-o", "LogLevel=ERROR"}
+		scpArgs := []string{"-r", "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes", "-o", "LogLevel=ERROR"}
 		if r.target.SSHKey != "" {
 			scpArgs = append(scpArgs, "-i", expandHome(r.target.SSHKey))
 		}
