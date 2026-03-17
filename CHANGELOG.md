@@ -9,6 +9,22 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Self-update from the dashboard with release notes display and SSE progress streaming (@mateusmetzker)
+- `POST /api/update` endpoint for browser-triggered updates with auto-restart (@mateusmetzker)
+- Release workflow now generates body from CHANGELOG.md (@mateusmetzker)
+
+### Fixed
+
+- Docs URL in install script (`/docs` → `/keel/docs`) (@mateusmetzker)
+- Missing `-r` flag in scp for recursive file sync to remote targets (@mateusmetzker)
+
+### Changed
+
+- Updater resolves latest version from GitHub Releases redirect instead of custom endpoint (@mateusmetzker)
+- README: add missing service config fields, full remote target schema, seeder script/interpreter docs, fix TOC and editorial issues (@mateusmetzker)
+
 ---
 
 ## [0.2] — 2026-03-15
