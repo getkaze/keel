@@ -491,7 +491,6 @@ Dashboard flags:
   -bind <addr>                              bind address (default 127.0.0.1)
   -keel-dir <path>                      data directory (default: OS-dependent)
   -dev                                      serve web assets from filesystem (dev mode)
-  -open                                     open browser after starting
 
 Environment:
   KEEL_DIR                              data directory override for CLI commands

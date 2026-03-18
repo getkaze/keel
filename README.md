@@ -14,7 +14,7 @@
 
   <br/>
 
-  [Install](#install) · [Usage](#usage) · [Features](#features) · [Seeders](#seeders) · [Dev Mode](#dev-mode) · [Remote Targets](#remote-targets) · [Service Config](#service-config) · [Stack](#stack) · [Build](#build) · [Data Directory](#data-directory)
+  [Prerequisites](#prerequisites) · [Install](#install) · [Usage](#usage) · [Features](#features) · [Seeders](#seeders) · [Dev Mode](#dev-mode) · [Remote Targets](#remote-targets) · [Service Config](#service-config) · [Stack](#stack) · [Build](#build) · [Data Directory](#data-directory)
 
 </div>
 
@@ -29,6 +29,14 @@ keel
 ```
 
 That's it. Open `http://localhost:60000` and you have a full dashboard with live status, logs, terminal, metrics, and container management.
+
+---
+
+## Prerequisites
+
+- **Docker** — local install or remote host with Docker via SSH
+- **SSH key pair** — required for remote targets
+- **sudo** — only for `keel hosts setup` (modifies `/etc/hosts`)
 
 ---
 
@@ -254,7 +262,7 @@ keel start           # commands now execute on ec2 via SSH
 keel target local    # switch back
 ```
 
-For remote targets, an SSH tunnel is opened automatically, forwarding the remote Docker socket to a local Unix socket (`/tmp/keel-docker-<target>.sock`).
+For remote targets, an SSH tunnel is opened automatically, forwarding the remote Docker socket to a local Unix socket (`/tmp/keel-docker-<target>.sock`). The tunnel is monitored with automatic reconnection and exponential backoff — a live status dot in the topbar shows the connection state via SSE.
 
 ---
 
@@ -326,7 +334,7 @@ Each service is a JSON file in `data/services/`. Full example:
 | Design | Kaze design system — Recursive variable font |
 | Assets | `go:embed` — single binary, ~10MB |
 | Icons | Lucide v0.469.0 (self-hosted SVG sprite) |
-| Metrics | gopsutil v4, `docker stats` |
+| Metrics | gopsutil v4, `docker stats`, remote cache (10s) |
 
 ---
 
@@ -351,8 +359,11 @@ sudo bash install-dev.sh
 # Run with live asset reloading
 keel -dev
 
-# Run tests
+# Run tests (155 unit tests)
 go test ./...
+
+# Run with race detection
+go test -race ./...
 ```
 
 ---
