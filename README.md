@@ -14,7 +14,7 @@
 
   <br/>
 
-  [Install](#install) · [Usage](#usage) · [Features](#features) · [Seeders](#seeders) · [Dev Mode](#dev-mode) · [Remote Targets](#remote-targets) · [Stack](#stack) · [Build](#build)
+  [Install](#install) · [Usage](#usage) · [Features](#features) · [Seeders](#seeders) · [Dev Mode](#dev-mode) · [Remote Targets](#remote-targets) · [Service Config](#service-config) · [Stack](#stack) · [Build](#build) · [Data Directory](#data-directory)
 
 </div>
 
@@ -22,7 +22,7 @@
 
 ## What is Keel
 
-**Keel** (the keel of a ship — the hidden structure that keeps everything aligned) is a self-hosted web dashboard for managing Docker environments — local or remote via SSH — from a single Go binary (~10MB, no external dependencies)..
+**Keel** (the keel of a ship — the hidden structure that keeps everything aligned) is a self-hosted web dashboard for managing Docker environments — local or remote via SSH — from a single Go binary (~10MB, no external dependencies).
 
 ```
 keel
@@ -38,7 +38,7 @@ That's it. Open `http://localhost:60000` and you have a full dashboard with live
 curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash
 ```
 
-This installs the binary to `/usr/local/bin/keel` and creates the data directory at `/var/lib/keel`.
+This installs the binary to `~/.local/bin/keel` and creates the data directory at `/var/lib/keel`. The binary is owned by your user, enabling self-update from the dashboard without sudo.
 
 ---
 
@@ -51,8 +51,10 @@ keel
 # Container operations
 keel start                     # start all services
 keel start redis mysql         # start specific services
+keel start infra               # start all services in a group
 keel stop                      # stop all services
 keel stop traefik              # stop specific service
+keel stop tools                # stop all services in a group
 keel reset --all               # destroy and recreate all containers
 keel reset redis               # recreate a single service
 
@@ -156,7 +158,16 @@ Each seeder is a JSON file in `data/seeders/`:
 |-------|-------------|
 | `target` | Container name to exec into |
 | `order` | Execution order (lower = first) |
-| `commands` | Ordered list of `{ name, command }` steps |
+| `commands` | Ordered list of steps (see below) |
+
+Each command entry supports:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Step identifier |
+| `command` | Single command to execute via `docker exec` |
+| `script` | Filename of a script in the seeders directory (alternative to `command`) |
+| `interpreter` | Interpreter to pipe the script into — e.g. `bash`, `python3` (used with `script`) |
 
 Seeders can be run from the UI (Seeders page) or via CLI:
 
@@ -207,15 +218,35 @@ Example service config:
 
 Keel supports multiple Docker targets — local or remote via SSH tunnel.
 
+<!-- /var/lib/keel/data/targets.json -->
 ```json
-// /var/lib/keel/data/targets.json
 {
   "targets": {
     "local": { "host": "127.0.0.1" },
-    "ec2":   { "host": "user@1.2.3.4", "ssh_key": "~/.ssh/id_ed25519", "external_ip": "1.2.3.4" }
-  }
+    "ec2": {
+      "host": "1.2.3.4",
+      "ssh_user": "ubuntu",
+      "ssh_key": "~/.ssh/id_ed25519",
+      "ssh_jump": "ec2-user@bastion.example.com",
+      "external_ip": "1.2.3.4",
+      "port_bind": "0.0.0.0",
+      "description": "AWS EC2 Ubuntu"
+    }
+  },
+  "default": "local"
 }
 ```
+
+| Field | Description |
+|-------|-------------|
+| `host` | IP address or hostname |
+| `ssh_user` | SSH user for remote targets (omit for local) |
+| `ssh_key` | Path to SSH private key (supports `~/`) |
+| `ssh_jump` | Bastion/jump host for multi-hop SSH |
+| `external_ip` | External IP used by `keel hosts setup` |
+| `port_bind` | Bind interface for ports — `127.0.0.1` (default) or `0.0.0.0` |
+| `description` | Human-readable target label |
+| `default` | Root-level field — default target name |
 
 ```bash
 keel target ec2      # switch to remote
@@ -237,11 +268,13 @@ Each service is a JSON file in `data/services/`. Full example:
   "group": "database",
   "hostname": "keel-redis",
   "image": "redis:7",
-  "registry": "dockerhub",
   "network": "keel-net",
   "ports": { "internal": 6379, "external": 6379 },
   "environment": { "REDIS_ARGS": "--maxmemory 256mb" },
   "volumes": ["keel-redis-data:/data"],
+  "command": "redis-server --save 60 1",
+  "files": ["data/config/redis.conf:/etc/redis/redis.conf"],
+  "start_order": 1,
   "ram_estimate_mb": 256,
   "dashboard_url": "http://localhost:8001",
   "health_check": {
@@ -262,6 +295,26 @@ Each service is a JSON file in `data/services/`. Full example:
 }
 ```
 
+| Field | Description |
+|-------|-------------|
+| `name` | Unique service identifier |
+| `group` | Logical grouping — `infra` starts first, then seeders, then the rest |
+| `hostname` | Docker container hostname |
+| `image` | Docker image `name:tag` |
+| `registry` | Set to `ghcr` to auto-login with stored credentials (omit for public images) |
+| `network` | Docker network (defaults to `keel-net`) |
+| `ports` | `{ internal, external }` port mapping |
+| `environment` | Environment variables passed to the container |
+| `volumes` | Volume mounts — named volumes, bind mounts, or config files |
+| `command` | Override container CMD |
+| `files` | Config files mounted read-only into the container; synced via `scp` on remote targets (`local:container`) |
+| `start_order` | Startup priority (lower = earlier, 0 = last) |
+| `ram_estimate_mb` | Display hint for the dashboard |
+| `dashboard_url` | External URL — shows an **OPEN** button in the UI |
+| `health_check` | HTTP or command-based health check config |
+| `logs` | Log sources — `docker` or `file` with optional `host_path` |
+| `dev` | Development mode config — `dockerfile`, `command`, `cap_add` |
+
 ---
 
 ## Stack
@@ -273,7 +326,7 @@ Each service is a JSON file in `data/services/`. Full example:
 | Design | Kaze design system — Recursive variable font |
 | Assets | `go:embed` — single binary, ~10MB |
 | Icons | Lucide v0.469.0 (self-hosted SVG sprite) |
-| Metrics | `/proc/stat`, `/proc/meminfo`, `syscall.Statfs`, `docker stats` |
+| Metrics | gopsutil v4, `docker stats` |
 
 ---
 

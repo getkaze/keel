@@ -88,27 +88,57 @@ jobs:
         with:
           path: artifacts
 
+      - name: Build release body
+        run: |
+          VERSION="${{ github.ref_name }}"
+          SEMVER="${VERSION#v}"
+
+          # Extract the section for this version from CHANGELOG.md
+          NOTES=$(awk -v ver="$SEMVER" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]")) { found=1; next }
+            }
+            found && /^---$/ { exit }
+            found { print }
+          ' CHANGELOG.md)
+
+          # Build the release body
+          cat > /tmp/release-body.md << 'HEADER'
+          ## What's new
+          HEADER
+
+          if [ -n "$(echo "$NOTES" | tr -d '[:space:]')" ]; then
+            echo "$NOTES" >> /tmp/release-body.md
+          else
+            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details." >> /tmp/release-body.md
+          fi
+
+          cat >> /tmp/release-body.md << FOOTER
+
+          ---
+
+          ## Installation
+
+          \`\`\`bash
+          curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash
+          \`\`\`
+
+          ## Manual download
+
+          | Platform | Link |
+          |---|---|
+          | Linux amd64  | [keel-linux-amd64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-linux-amd64) |
+          | Linux arm64  | [keel-linux-arm64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-linux-arm64) |
+          | macOS amd64  | [keel-darwin-amd64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-darwin-amd64) |
+          | macOS arm64  | [keel-darwin-arm64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-darwin-arm64) |
+          FOOTER
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          body: |
-            ## keel ${{ github.ref_name }}
-
-            ### Installation
-
-            ```bash
-            curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash
-            ```
-
-            ### Manual download
-
-            | Platform | Link |
-            |---|---|
-            | Linux amd64  | [keel-linux-amd64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-linux-amd64) |
-            | Linux arm64  | [keel-linux-arm64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-linux-arm64) |
-            | macOS amd64  | [keel-darwin-amd64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-darwin-amd64) |
-            | macOS arm64  | [keel-darwin-arm64](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/keel-darwin-arm64) |
+          body_path: /tmp/release-body.md
           files: |
             artifacts/keel-linux-amd64/keel-linux-amd64
             artifacts/keel-linux-arm64/keel-linux-arm64
