@@ -12,6 +12,7 @@ import (
 
 	"github.com/getkaze/keel/internal/config"
 	"github.com/getkaze/keel/internal/model"
+	keelssh "github.com/getkaze/keel/internal/ssh"
 )
 
 // Runner executes docker commands on a target (local or remote via SSH).
@@ -122,7 +123,7 @@ func (r *Runner) Boot(ctx context.Context, svc model.Service, keelDir string) er
 	}
 
 	if svc.Registry == "ghcr" {
-		if err := r.ghcrLogin(ctx, keelDir); err != nil {
+		if err := r.GHCRLogin(ctx, keelDir); err != nil {
 			return fmt.Errorf("ghcr: %w", err)
 		}
 	}
@@ -130,7 +131,7 @@ func (r *Runner) Boot(ctx context.Context, svc model.Service, keelDir string) er
 	// For remote targets, sync files to the remote host before boot
 	// so that volume mounts can find them.
 	if r.target.Mode != "local" && len(svc.Files) > 0 {
-		if err := r.syncFiles(ctx, svc, keelDir); err != nil {
+		if err := r.SyncFiles(ctx, svc, keelDir); err != nil {
 			return fmt.Errorf("sync files: %w", err)
 		}
 	}
@@ -139,18 +140,30 @@ func (r *Runner) Boot(ctx context.Context, svc model.Service, keelDir string) er
 	return r.Exec(ctx, args...)
 }
 
-// syncFiles copies service files to the remote host via scp so that
+// SyncFiles copies service files to the remote host via scp so that
 // Docker volume mounts work. Each file entry has the format
 // "relative/path:/container/path"; we copy the local file to the same
 // absolute path (keelDir + relative) on the remote host.
-func (r *Runner) syncFiles(ctx context.Context, svc model.Service, keelDir string) error {
+func (r *Runner) SyncFiles(ctx context.Context, svc model.Service, keelDir string) error {
 	for _, f := range svc.Files {
 		parts := strings.SplitN(f, ":", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		localSrc := filepath.Join(keelDir, parts[0])
-		remoteDst := filepath.Join(keelDir, parts[0])
+
+		// Validate the relative path does not escape keelDir via traversal.
+		cleaned := filepath.Clean(parts[0])
+		if strings.HasPrefix(cleaned, "..") || filepath.IsAbs(cleaned) {
+			return fmt.Errorf("sync files: path traversal rejected: %s", parts[0])
+		}
+
+		localSrc := filepath.Join(keelDir, cleaned)
+		remoteDst := filepath.Join(keelDir, cleaned)
+
+		// Double-check resolved paths are within keelDir.
+		if !strings.HasPrefix(localSrc, filepath.Clean(keelDir)+string(filepath.Separator)) {
+			return fmt.Errorf("sync files: resolved path outside keel dir: %s", localSrc)
+		}
 
 		// Ensure parent directory exists on remote host and remove any
 		// stale directory at the destination path (Docker creates a
@@ -170,14 +183,14 @@ func (r *Runner) syncFiles(ctx context.Context, svc model.Service, keelDir strin
 		}
 
 		// Build scp args with the same SSH options (key, jump host).
-		scpArgs := []string{"-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes", "-o", "LogLevel=ERROR"}
+		scpArgs := []string{"-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes", "-o", "LogLevel=ERROR"}
 		if r.target.SSHKey != "" {
-			scpArgs = append(scpArgs, "-i", expandHome(r.target.SSHKey))
+			scpArgs = append(scpArgs, "-i", keelssh.ExpandHome(r.target.SSHKey))
 		}
 		if r.target.SSHJump != "" {
-			proxyCmd := "ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o LogLevel=ERROR"
+			proxyCmd := "ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o LogLevel=ERROR"
 			if r.target.SSHKey != "" {
-				proxyCmd += " -i " + expandHome(r.target.SSHKey)
+				proxyCmd += " -i " + keelssh.ExpandHome(r.target.SSHKey)
 			}
 			proxyCmd += " -W %h:%p " + r.target.SSHJump
 			scpArgs = append(scpArgs, "-o", "ProxyCommand="+proxyCmd)
@@ -338,9 +351,9 @@ func (r *Runner) networkSubnet() string {
 	return cfg.NetworkSubnet
 }
 
-// ghcrLogin logs in to ghcr.io using credentials stored in keelDir/state/.
+// GHCRLogin logs in to ghcr.io using credentials stored in keelDir/state/.
 // Only supported on local targets; silently skipped for remote targets.
-func (r *Runner) ghcrLogin(ctx context.Context, keelDir string) error {
+func (r *Runner) GHCRLogin(ctx context.Context, keelDir string) error {
 	pat, err := os.ReadFile(filepath.Join(keelDir, "state/ghcr-pat"))
 	if err != nil || len(bytes.TrimSpace(pat)) == 0 {
 		return fmt.Errorf("PAT not found at %s/state/ghcr-pat", keelDir)
@@ -364,17 +377,23 @@ func (r *Runner) ghcrLogin(ctx context.Context, keelDir string) error {
 		return cmd.Run()
 	}
 
-	// Remote: pipe PAT via SSH stdin into docker login on the target.
+	// Remote: pipe PAT via SSH stdin so it never appears in process args.
 	sshArgs := r.buildSSHArgs()
-	sshArgs = append(sshArgs, fmt.Sprintf("echo %s | docker login ghcr.io -u %s --password-stdin",
-		shellQuote(string(ghcrPat)), shellQuote(ghcrUser)))
+	sshArgs = append(sshArgs, fmt.Sprintf("docker login ghcr.io -u %s --password-stdin",
+		shellQuote(ghcrUser)))
 	cmd := exec.CommandContext(ctx, "ssh", sshArgs...)
+	cmd.Stdin = bytes.NewReader(append(ghcrPat, '\n'))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
-// DockerCmd implements docker.CmdBuilder, routing via SSH for remote targets.
+// PortBind returns the address to bind container ports to for this target.
+func (r *Runner) PortBind() string {
+	return r.target.PortBind
+}
+
+// DockerCmd implements docker.CmdRunner, routing via SSH for remote targets.
 func (r *Runner) DockerCmd(ctx context.Context, args ...string) *exec.Cmd {
 	return r.buildCmd(ctx, args...)
 }
@@ -393,27 +412,7 @@ func (r *Runner) buildCmd(ctx context.Context, dockerArgs ...string) *exec.Cmd {
 
 // buildSSHArgs returns the SSH flags for the current target.
 func (r *Runner) buildSSHArgs() []string {
-	args := []string{
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "BatchMode=yes",
-		"-o", "LogLevel=ERROR",
-	}
-	if r.target.SSHKey != "" {
-		args = append(args, "-i", expandHome(r.target.SSHKey))
-	}
-	if r.target.SSHJump != "" {
-		// Use ProxyCommand instead of -J so the identity key is also
-		// applied to the jump-host connection (ProxyJump/-J does not
-		// forward -i to the jump hop).
-		proxyCmd := "ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o LogLevel=ERROR"
-		if r.target.SSHKey != "" {
-			proxyCmd += " -i " + expandHome(r.target.SSHKey)
-		}
-		proxyCmd += " -W %h:%p " + r.target.SSHJump
-		args = append(args, "-o", "ProxyCommand="+proxyCmd)
-	}
-	args = append(args, r.target.SSHUser+"@"+r.target.Host)
-	return args
+	return keelssh.BuildArgs(r.target)
 }
 
 // buildRunArgs assembles the arguments for a `docker run` command from a service definition.
@@ -455,7 +454,11 @@ func buildRunArgs(svc model.Service, keelDir, portBind string) []string {
 
 	args = append(args, svc.Image)
 	if svc.Command != "" {
-		args = append(args, strings.Fields(svc.Command)...)
+		if strings.ContainsAny(svc.Command, " \t\"'") {
+			args = append(args, "sh", "-c", svc.Command)
+		} else {
+			args = append(args, svc.Command)
+		}
 	}
 	return args
 }
@@ -481,16 +484,6 @@ func resolveVolume(vol, keelDir string) string {
 // shellQuote wraps a string in single quotes, escaping embedded single quotes.
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
-// expandHome expands a leading ~/ to the user's home directory.
-func expandHome(path string) string {
-	if strings.HasPrefix(path, "~/") {
-		if home, err := os.UserHomeDir(); err == nil {
-			return filepath.Join(home, path[2:])
-		}
-	}
-	return path
 }
 
 // shellJoin joins args into a shell-safe string for SSH execution.
