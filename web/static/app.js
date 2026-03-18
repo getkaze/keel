@@ -268,6 +268,12 @@ function setActiveNav(page) {
 }
 
 document.addEventListener('click', function(e) {
+    // Close donate dropdown when clicking outside
+    var dropdown = document.querySelector('.donate-dropdown.open');
+    if (dropdown && !dropdown.contains(e.target)) {
+        dropdown.classList.remove('open');
+    }
+
     var navItem = e.target.closest('[data-page]');
     if (!navItem) return;
     setActiveNav(navItem.getAttribute('data-page'));

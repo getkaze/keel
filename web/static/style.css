@@ -226,6 +226,38 @@ a:hover { opacity: 0.85; }
     opacity: 1;
 }
 
+.donate-dropdown .donate-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 160px;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+
+.donate-dropdown.open .donate-menu { display: block; }
+
+.donate-menu a {
+    display: block;
+    padding: 6px 12px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: .03em;
+}
+
+.donate-menu a:hover {
+    color: var(--text);
+    background: var(--surface2);
+}
+
 .topbar-right {
     margin-left: auto;
     display: flex;
