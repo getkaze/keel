@@ -3,14 +3,16 @@ package terminal
 import (
 	"os"
 	"os/exec"
+	"sync"
 
 	"github.com/creack/pty"
 )
 
 // Session holds a PTY-attached bash process.
 type Session struct {
-	PTY *os.File
-	Cmd *exec.Cmd
+	PTY       *os.File
+	Cmd       *exec.Cmd
+	closeOnce sync.Once
 }
 
 // NewSession spawns /bin/bash with a PTY.
@@ -58,18 +60,15 @@ func (s *Session) Resize(rows, cols uint16) error {
 	})
 }
 
-// ClearScreen writes a clear command to the shell via PTY stdin.
-func (s *Session) ClearScreen() {
-	s.PTY.Write([]byte("clear\n"))
-}
-
-// Close terminates the session and cleans up.
+// Close terminates the session and cleans up. Safe to call multiple times.
 func (s *Session) Close() {
-	if s.PTY != nil {
-		s.PTY.Close()
-	}
-	if s.Cmd != nil && s.Cmd.Process != nil {
-		s.Cmd.Process.Kill()
-		s.Cmd.Wait()
-	}
+	s.closeOnce.Do(func() {
+		if s.PTY != nil {
+			s.PTY.Close()
+		}
+		if s.Cmd != nil && s.Cmd.Process != nil {
+			s.Cmd.Process.Kill()
+			s.Cmd.Wait()
+		}
+	})
 }
