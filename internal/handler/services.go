@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"sort"
@@ -47,8 +48,8 @@ func RegisterServiceRoutes(mux *http.ServeMux, deps *ServiceDeps) {
 	mux.HandleFunc("POST /api/services/{name}/stop", deps.stopService)
 	mux.HandleFunc("POST /api/services/{name}/restart", deps.restartService)
 	mux.HandleFunc("POST /api/services/{name}/update", deps.updateService)
-	mux.HandleFunc("GET /api/services/start-all", deps.startAll)
-	mux.HandleFunc("GET /api/services/stop-all", deps.stopAll)
+	mux.HandleFunc("POST /api/services/start-all", deps.startAll)
+	mux.HandleFunc("POST /api/services/stop-all", deps.stopAll)
 	mux.HandleFunc("GET /api/services/{name}/metrics", deps.getServiceMetrics)
 	mux.HandleFunc("GET /api/services/{name}/config", deps.getServiceConfig)
 	mux.HandleFunc("PUT /api/services/{name}/config", deps.saveServiceConfig)
@@ -101,6 +102,15 @@ func (d *ServiceDeps) getService(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *ServiceDeps) createService(w http.ResponseWriter, r *http.Request) {
+	release := d.Mutex.TryAcquire(w, "create")
+	if release == nil {
+		return
+	}
+	defer release()
+
+	// Limit body to 64 KB to prevent abuse.
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return
@@ -305,7 +315,7 @@ func (d *ServiceDeps) startAll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := <-errc; err != nil {
-			fmt.Fprintf(w, "event: error\ndata: seeder failed: %s\n\n", err.Error())
+			fmt.Fprintf(w, "event: app-error\ndata: seeder failed: %s\n\n", err.Error())
 			flusher.Flush()
 			d.Docker.Invalidate()
 			return // STOP — don't start app services
@@ -483,13 +493,18 @@ func (d *ServiceDeps) getServiceConfig(w http.ResponseWriter, r *http.Request) {
 func (d *ServiceDeps) saveServiceConfig(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 
+	// Limit body to 1 MB to prevent abuse.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	// Accept raw JSON body OR form field "config"
 	var data []byte
 	ct := r.Header.Get("Content-Type")
 	if strings.Contains(ct, "application/json") {
-		var buf strings.Builder
-		if _, err := fmt.Fscan(r.Body, &buf); err == nil {
-			data = []byte(buf.String())
+		var err error
+		data, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
 		}
 	} else {
 		r.ParseForm()
@@ -498,6 +513,11 @@ func (d *ServiceDeps) saveServiceConfig(w http.ResponseWriter, r *http.Request) 
 
 	if len(data) == 0 {
 		http.Error(w, "empty body", http.StatusBadRequest)
+		return
+	}
+
+	if !json.Valid(data) {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -529,7 +549,7 @@ func (d *ServiceDeps) streamCommand(w http.ResponseWriter, r *http.Request, comm
 	}
 
 	if err := <-errc; err != nil {
-		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+		fmt.Fprintf(w, "event: app-error\ndata: %s\n\n", err.Error())
 	} else {
 		fmt.Fprintf(w, "event: done\ndata: %s %s completed\n\n", command, args)
 	}
