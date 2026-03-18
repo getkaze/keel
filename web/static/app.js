@@ -115,50 +115,132 @@ function confirmAction(title, message, confirmText, confirmClass, onConfirm) {
     modal.showModal();
 }
 
-// SSE stream handler for operation progress
+// SSE stream handler for operation progress (supports both GET and POST)
 function startSSE(url, opts) {
     opts = opts || {};
+    var method = opts.method || 'GET';
     var panel = document.getElementById('operation-output');
     if (panel) {
         panel.innerHTML = '';
         document.getElementById('operation-panel').classList.remove('hidden');
     }
 
-    var source = new EventSource(url);
+    if (method === 'GET') {
+        var source = new EventSource(url);
 
-    source.onmessage = function(e) {
-        if (!panel) return;
-        var converter = getAnsiUp();
-        var line = document.createElement('div');
-        line.innerHTML = safeAnsiHtml(converter, e.data);
-        panel.appendChild(line);
-        panel.scrollTop = panel.scrollHeight;
-    };
+        source.onmessage = function(e) {
+            if (!panel) return;
+            var converter = getAnsiUp();
+            var line = document.createElement('div');
+            line.innerHTML = safeAnsiHtml(converter, e.data);
+            panel.appendChild(line);
+            panel.scrollTop = panel.scrollHeight;
+        };
 
-    source.addEventListener('done', function(e) {
-        source.close();
+        source.addEventListener('done', function(e) {
+            source.close();
+            if (panel) {
+                var banner = document.createElement('div');
+                banner.className = 'text-success font-semibold mt-2';
+                banner.textContent = e.data || 'Operation completed successfully';
+                panel.appendChild(banner);
+            }
+            showToast(opts.successMessage || 'Operation completed', 'success');
+            htmx.trigger(document.body, 'refreshServices');
+        });
+
+        source.addEventListener('app-error', function(e) {
+            source.close();
+            if (panel) {
+                var banner = document.createElement('div');
+                banner.className = 'text-error font-semibold mt-2';
+                banner.textContent = e.data || 'Operation failed';
+                panel.appendChild(banner);
+            }
+            showToast(opts.errorMessage || 'Operation failed', 'error');
+        });
+
+        return source;
+    }
+
+    // POST-based SSE: use fetch + ReadableStream
+    _fetchSSE(url, method, panel, opts);
+}
+
+function _fetchSSE(url, method, panel, opts) {
+    fetch(url, { method: method }).then(function(response) {
+        if (!response.ok) {
+            showToast(opts.errorMessage || 'Operation failed', 'error');
+            return;
+        }
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function processChunk(result) {
+            if (result.done) {
+                // Process remaining buffer
+                if (buffer.trim()) _parseSSEBuffer(buffer, panel, opts);
+                return;
+            }
+            buffer += decoder.decode(result.value, { stream: true });
+            // Split on double newlines (SSE frame boundary)
+            var frames = buffer.split('\n\n');
+            buffer = frames.pop(); // keep incomplete frame
+            for (var i = 0; i < frames.length; i++) {
+                _parseSSEFrame(frames[i].trim(), panel, opts);
+            }
+            return reader.read().then(processChunk);
+        }
+
+        return reader.read().then(processChunk);
+    }).catch(function() {
+        showToast(opts.errorMessage || 'Connection failed', 'error');
+    });
+}
+
+function _parseSSEBuffer(buf, panel, opts) {
+    var frames = buf.split('\n\n');
+    for (var i = 0; i < frames.length; i++) {
+        if (frames[i].trim()) _parseSSEFrame(frames[i].trim(), panel, opts);
+    }
+}
+
+function _parseSSEFrame(frame, panel, opts) {
+    if (!frame) return;
+    var event = 'message';
+    var data = '';
+    var lines = frame.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+        if (lines[i].indexOf('event: ') === 0) event = lines[i].substring(7).trim();
+        else if (lines[i].indexOf('data: ') === 0) data = lines[i].substring(6);
+    }
+
+    if (event === 'done') {
         if (panel) {
             var banner = document.createElement('div');
             banner.className = 'text-success font-semibold mt-2';
-            banner.textContent = e.data || 'Operation completed successfully';
+            banner.textContent = data || 'Operation completed successfully';
             panel.appendChild(banner);
         }
         showToast(opts.successMessage || 'Operation completed', 'success');
         htmx.trigger(document.body, 'refreshServices');
-    });
-
-    source.addEventListener('error', function(e) {
-        source.close();
+    } else if (event === 'app-error') {
         if (panel) {
             var banner = document.createElement('div');
             banner.className = 'text-error font-semibold mt-2';
-            banner.textContent = e.data || 'Operation failed';
+            banner.textContent = data || 'Operation failed';
             panel.appendChild(banner);
         }
         showToast(opts.errorMessage || 'Operation failed', 'error');
-    });
-
-    return source;
+    } else {
+        if (!panel) return;
+        var converter = getAnsiUp();
+        var line = document.createElement('div');
+        line.innerHTML = safeAnsiHtml(converter, data);
+        panel.appendChild(line);
+        panel.scrollTop = panel.scrollHeight;
+    }
 }
 
 // Keyboard shortcuts
@@ -199,10 +281,11 @@ function connectToContainer(name) {
 // Navigate to logs page with a specific service pre-selected
 function navigateToLogs(serviceName) {
     htmx.ajax('GET', '/partials/logs', {target: '#main-content', swap: 'innerHTML'}).then(function() {
-        // Wait for Alpine to initialize the log-viewer component, then dispatch event
-        setTimeout(function() {
+        // Dispatch after HTMX finishes settling the swapped DOM
+        document.addEventListener('htmx:afterSettle', function onSettle() {
+            document.removeEventListener('htmx:afterSettle', onSettle);
             document.dispatchEvent(new CustomEvent('open-logs', { detail: { service: serviceName } }));
-        }, 100);
+        });
     });
     history.pushState(null, '', '/logs');
     setActiveNav('/logs');
@@ -236,7 +319,21 @@ document.addEventListener('htmx:afterRequest', function(e) {
     if (!action || !actionMessages[action]) return;
 
     if (e.detail.successful) {
-        showToast(actionMessages[action].ok, 'success');
+        // SSE streams return HTTP 200 even on failure — check the response
+        // body for "event: app-error" to detect errors inside the stream.
+        var responseText = e.detail.xhr.responseText || '';
+        var errorIdx = responseText.indexOf('event: app-error');
+        if (errorIdx !== -1) {
+            var reason = '';
+            var dataPrefix = responseText.indexOf('data: ', errorIdx);
+            if (dataPrefix !== -1) {
+                var lineEnd = responseText.indexOf('\n', dataPrefix);
+                reason = responseText.substring(dataPrefix + 6, lineEnd !== -1 ? lineEnd : undefined).trim();
+            }
+            showToast(actionMessages[action].fail + (reason ? ': ' + reason : ''), 'error');
+        } else {
+            showToast(actionMessages[action].ok, 'success');
+        }
     }
 });
 
@@ -361,7 +458,7 @@ function seederSSE(url, btn, name) {
         if (out) { out.innerHTML = ''; sessionStorage.removeItem('seederLog-' + name); }
         showSeederLog(name);
     } else {
-        document.querySelectorAll('.seeder-card').forEach(function(c) {
+        document.querySelectorAll('.seeder-item').forEach(function(c) {
             var n = c.id.replace('seeder-card-', '');
             setSeederStatus(n, 'running');
             var out = document.getElementById('seeder-log-output-' + n);
@@ -370,54 +467,98 @@ function seederSSE(url, btn, name) {
         });
     }
 
-    var source = new EventSource(url);
-
-    source.onmessage = function(e) {
+    function onData(data) {
         if (name) {
-            appendSeederLog(name, e.data);
+            appendSeederLog(name, data);
         } else {
-            var match = e.data.match(/^\[([^\]]+)\]/);
-            if (match) appendSeederLog(match[1], e.data);
+            var match = data.match(/^\[([^\]]+)\]/);
+            if (match) appendSeederLog(match[1], data);
         }
-    };
+    }
 
-    source.addEventListener('done', function(e) {
-        source.close();
+    function onDone(data) {
         btn.disabled = false;
         if (btn.querySelector('span')) btn.querySelector('span').textContent = originalText;
         if (name) {
             setSeederStatus(name, 'success');
-            appendSeederLog(name, '✓ ' + (e.data || 'completed'));
+            appendSeederLog(name, '✓ ' + (data || 'completed'));
             showToast('Seeder completed', 'success');
         } else {
-            document.querySelectorAll('.seeder-card').forEach(function(c) {
+            document.querySelectorAll('.seeder-item').forEach(function(c) {
                 setSeederStatus(c.id.replace('seeder-card-', ''), 'success');
             });
             showToast('Seeders completed', 'success');
         }
-    });
+    }
 
-    source.addEventListener('error', function(e) {
-        source.close();
+    function onError(data) {
         btn.disabled = false;
         if (btn.querySelector('span')) btn.querySelector('span').textContent = originalText;
         showToast('Seeder failed', 'error');
         if (name) {
             setSeederStatus(name, 'error');
-            appendSeederLog(name, '✗ ' + (e.data || 'failed'));
+            appendSeederLog(name, '✗ ' + (data || 'failed'));
         } else {
-            var errMatch = e.data ? e.data.match(/seeder "([^"]+)"/) : null;
+            var errMatch = data ? data.match(/seeder "([^"]+)"/) : null;
             var failedName = errMatch ? errMatch[1] : null;
-            document.querySelectorAll('.seeder-card').forEach(function(c) {
+            document.querySelectorAll('.seeder-item').forEach(function(c) {
                 var n = c.id.replace('seeder-card-', '');
                 if (n === failedName) {
                     setSeederStatus(n, 'error');
-                    appendSeederLog(n, '✗ ' + (e.data || 'failed'));
+                    appendSeederLog(n, '✗ ' + (data || 'failed'));
                 } else if (c.classList.contains('seeder-running')) {
                     setSeederStatus(n, 'idle');
                 }
             });
         }
+    }
+
+    fetch(url, { method: 'POST' }).then(function(response) {
+        if (!response.ok) {
+            onError('request failed: ' + response.status);
+            return;
+        }
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function processChunk(result) {
+            if (result.done) {
+                if (buffer.trim()) processFrames(buffer);
+                return;
+            }
+            buffer += decoder.decode(result.value, { stream: true });
+            var frames = buffer.split('\n\n');
+            buffer = frames.pop();
+            for (var i = 0; i < frames.length; i++) {
+                if (frames[i].trim()) processFrame(frames[i].trim());
+            }
+            return reader.read().then(processChunk);
+        }
+
+        function processFrames(buf) {
+            var parts = buf.split('\n\n');
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].trim()) processFrame(parts[i].trim());
+            }
+        }
+
+        function processFrame(frame) {
+            var event = 'message';
+            var data = '';
+            var lines = frame.split('\n');
+            for (var i = 0; i < lines.length; i++) {
+                if (lines[i].indexOf('event: ') === 0) event = lines[i].substring(7).trim();
+                else if (lines[i].indexOf('data: ') === 0) data = lines[i].substring(6);
+            }
+            if (event === 'done') onDone(data);
+            else if (event === 'app-error') onError(data);
+            else onData(data);
+        }
+
+        return reader.read().then(processChunk);
+    }).catch(function() {
+        onError('connection failed');
     });
 }
 

@@ -1577,18 +1577,10 @@ article.card, .service-card {
 .seeder-status.pending { color: var(--muted2); }
 .seeder-status.running { color: var(--yellow); }
 
-/* Legacy seeder card compat */
-.seeder-card {
-    background: var(--surface);
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    transition: background .15s;
-}
-.seeder-card:hover { background: var(--surface2); }
-.seeder-card.seeder-idle    { border-left: 2px solid var(--muted2); }
-.seeder-card.seeder-running { border-left: 2px solid var(--yellow); }
-.seeder-card.seeder-success { border-left: 2px solid var(--green); }
-.seeder-card.seeder-error   { border-left: 2px solid var(--red); }
+.seeder-item.seeder-idle    { border-left: 2px solid var(--muted2); }
+.seeder-item.seeder-running { border-left: 2px solid var(--yellow); }
+.seeder-item.seeder-success { border-left: 2px solid var(--green); }
+.seeder-item.seeder-error   { border-left: 2px solid var(--red); }
 
 /* ══════════════════════════════════════════
    15. TARGETS VIEW

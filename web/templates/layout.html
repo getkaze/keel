@@ -50,7 +50,7 @@
 
         <div class="topbar-right">
             <div class="target-selector">
-                <span class="target-dot"></span>
+                <span class="target-dot" id="tunnel-dot"></span>
                 {{.TargetName}}
             </div>
             <div id="metrics-mini"
@@ -249,6 +249,25 @@
             document.documentElement.setAttribute('data-theme', saved);
             updateThemeIcons(saved);
         }
+    })();
+
+    // Tunnel status indicator (SSE)
+    (function() {
+        var dot = document.getElementById('tunnel-dot');
+        if (!dot) return;
+        var colors = {
+            connected:    'var(--green)',
+            reconnecting: 'var(--yellow, #e2b93d)',
+            failed:       'var(--red, #e25c5c)',
+            disconnected: 'var(--muted, #888)'
+        };
+        var es = new EventSource('/api/tunnel/status');
+        es.onmessage = function(e) {
+            var c = colors[e.data] || colors.connected;
+            dot.style.background = c;
+            dot.style.boxShadow = '0 0 6px ' + c;
+            dot.title = 'Tunnel: ' + e.data;
+        };
     })();
     </script>
     <script src="/static/alpine.min.js" defer></script>
