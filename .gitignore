@@ -1,2 +1,11 @@
 bin/
 data/
+
+# Chati.dev runtime files (session lock — not committed)
+.chati/memories/*/session/
+CLAUDE.local.md
+CLAUDE.md
+chati.dev/
+.vscode/
+.claude/
+.chati/
