@@ -5,7 +5,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -44,11 +46,48 @@ func Check(current string) (*CheckResult, error) {
 		Current:   current,
 		Latest:    latest,
 		UpdateURL: downloadURL(latest),
-		Available: latest != current && current != "dev",
+		Available: current != "dev" && IsNewer(latest, current),
 	}, nil
 }
 
+// IsNewer reports whether version a is semantically newer than version b.
+// Versions are expected as "major.minor.patch" (leading "v" is stripped).
+// Falls back to string comparison if parsing fails.
+func IsNewer(a, b string) bool {
+	aParts, aOk := parseSemver(a)
+	bParts, bOk := parseSemver(b)
+	if !aOk || !bOk {
+		return a != b
+	}
+	for i := 0; i < 3; i++ {
+		if aParts[i] != bParts[i] {
+			return aParts[i] > bParts[i]
+		}
+	}
+	return false
+}
+
+// parseSemver splits "major.minor.patch" into [3]int.
+func parseSemver(v string) ([3]int, bool) {
+	v = strings.TrimPrefix(v, "v")
+	parts := strings.SplitN(v, ".", 3)
+	if len(parts) != 3 {
+		return [3]int{}, false
+	}
+	var result [3]int
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			return [3]int{}, false
+		}
+		result[i] = n
+	}
+	return result, true
+}
+
 // Download fetches the latest binary to a temp file and returns its path.
+// The temp file is created in the same directory as the running binary
+// to avoid cross-device rename errors when /tmp is on a different filesystem.
 func Download(version string) (string, error) {
 	url := downloadURL(version)
 
@@ -63,7 +102,13 @@ func Download(version string) (string, error) {
 		return "", fmt.Errorf("download: status %d", resp.StatusCode)
 	}
 
-	tmp, err := os.CreateTemp("", "keel-update-*")
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("find executable: %w", err)
+	}
+	targetDir := filepath.Dir(exe)
+
+	tmp, err := os.CreateTemp(targetDir, "keel-update-*")
 	if err != nil {
 		return "", fmt.Errorf("create temp: %w", err)
 	}
