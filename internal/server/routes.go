@@ -48,22 +48,20 @@ func registerRoutes(mux *http.ServeMux, cfg Config) {
 	// Shared dependencies
 	services := config.NewServiceStore(cfg.KeelDir)
 	poller := docker.NewStatusPoller()
-	executor := docker.NewExecutor(cfg.KeelDir, services)
+	executor := docker.NewExecutor(cfg.KeelDir, services, cfg.Runner)
 	opMutex := handler.NewOpMutex()
 
 	// Parse templates
 	tmpl := parseTemplates(cfg)
 
-	// Read active target for header badge.
-	targetInfo, _ := config.ReadTarget(cfg.KeelDir)
-	targetName := "local"
-	if targetInfo != nil {
-		targetName = targetInfo.Name
-	}
-
 	// Page renderer.
 	render := func(w http.ResponseWriter, page, serviceName string) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		targetInfo, _ := config.ReadTarget(cfg.KeelDir)
+		targetName := "local"
+		if targetInfo != nil {
+			targetName = targetInfo.Name
+		}
 		data := map[string]any{
 			"Version":     cfg.Version,
 			"Page":        page,
@@ -146,6 +144,9 @@ func registerRoutes(mux *http.ServeMux, cfg Config) {
 	mux.Handle("GET /ws/terminal", &handler.TerminalHandler{})
 	mux.Handle("GET /ws/terminal/exec/{name}", &handler.ExecTerminalHandler{Services: services})
 
+	// API: tunnel status (SSE)
+	mux.Handle("GET /api/tunnel/status", &handler.TunnelStatusHandler{Monitor: cfg.Tunnel})
+
 	// API: target, health, metrics, version
 	mux.Handle("GET /api/target", &handler.TargetHandler{KeelDir: cfg.KeelDir})
 	mux.Handle("GET /api/health", &handler.HealthHandler{Services: services, Docker: poller})
@@ -155,6 +156,7 @@ func registerRoutes(mux *http.ServeMux, cfg Config) {
 	}
 	mux.Handle("GET /api/metrics", metricsHandler)
 	mux.Handle("GET /api/version", &handler.VersionHandler{Version: cfg.Version})
+	mux.Handle("POST /api/update", &handler.UpdateHandler{Version: cfg.Version})
 
 	// Page partials (HTMX)
 	handler.RegisterPageRoutes(mux, &handler.PageDeps{

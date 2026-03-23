@@ -7,7 +7,10 @@ if ('serviceWorker' in navigator) {
 }
 
 // Version check: show update indicator if new version available
+var _versionData = null;
+
 fetch('/api/version').then(function(r) { return r.json(); }).then(function(data) {
+    _versionData = data;
     if (data.available) {
         var el = document.getElementById('update-indicator');
         var ver = document.getElementById('update-version');
@@ -17,6 +20,199 @@ fetch('/api/version').then(function(r) { return r.json(); }).then(function(data)
         }
     }
 }).catch(function() {});
+
+// Update modal
+function openUpdateModal() {
+    var modal = document.getElementById('update-modal');
+    if (!modal || !_versionData) return;
+
+    document.getElementById('update-modal-current').textContent = _versionData.current;
+    document.getElementById('update-modal-latest').textContent = _versionData.latest;
+
+    var changelogEl = document.getElementById('update-modal-changelog');
+    if (_versionData.changelog) {
+        changelogEl.innerHTML = renderMarkdown(_versionData.changelog);
+    } else {
+        changelogEl.innerHTML = '<p class="text-muted">No release notes available.</p>';
+    }
+
+    document.getElementById('update-modal-progress').style.display = 'none';
+    document.getElementById('update-modal-progress').innerHTML = '';
+    document.getElementById('update-modal-btn').disabled = false;
+    document.getElementById('update-modal-btn').style.display = '';
+    document.getElementById('update-modal-cancel').style.display = '';
+
+    modal.showModal();
+}
+
+function performUpdate() {
+    var btn = document.getElementById('update-modal-btn');
+    var progress = document.getElementById('update-modal-progress');
+    var changelog = document.getElementById('update-modal-changelog');
+    var cancelBtn = document.getElementById('update-modal-cancel');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-sm"></span> Updating...';
+    cancelBtn.style.display = 'none';
+    changelog.style.display = 'none';
+    progress.style.display = '';
+
+    fetch('/api/update', { method: 'POST' }).then(function(response) {
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+        var sseEventType = '';
+
+        function processLine(line) {
+            if (line.indexOf('event: ') === 0) {
+                sseEventType = line.substring(7).trim();
+                return;
+            }
+            if (line.indexOf('data: ') !== 0) {
+                if (line === '') sseEventType = '';
+                return;
+            }
+            var data = line.substring(6);
+            var eventType = sseEventType;
+            sseEventType = '';
+
+            var el = document.createElement('div');
+
+            if (eventType === 'done') {
+                el.className = 'text-success font-semibold';
+                el.textContent = data;
+                progress.appendChild(el);
+                btn.style.display = 'none';
+
+                var reloadLine = document.createElement('div');
+                reloadLine.className = 'text-muted mt-1';
+                reloadLine.textContent = 'Restarting keel... reloading in a few seconds.';
+                progress.appendChild(reloadLine);
+                setTimeout(function() { waitForRestart(); }, 2000);
+            } else if (eventType === 'app-error') {
+                el.className = 'text-error font-semibold';
+                el.textContent = data;
+                progress.appendChild(el);
+                btn.disabled = false;
+                btn.innerHTML = 'Retry';
+                cancelBtn.style.display = '';
+            } else {
+                el.textContent = data;
+                progress.appendChild(el);
+            }
+            progress.scrollTop = progress.scrollHeight;
+        }
+
+        function read() {
+            reader.read().then(function(result) {
+                if (result.done) return;
+                buffer += decoder.decode(result.value, { stream: true });
+                var lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (var i = 0; i < lines.length; i++) {
+                    processLine(lines[i]);
+                }
+                read();
+            });
+        }
+        read();
+    }).catch(function(err) {
+        var line = document.createElement('div');
+        line.className = 'text-error font-semibold';
+        line.textContent = 'Connection failed: ' + err.message;
+        progress.appendChild(line);
+        btn.disabled = false;
+        btn.innerHTML = 'Retry';
+        cancelBtn.style.display = '';
+    });
+}
+
+function waitForRestart() {
+    var attempts = 0;
+    var maxAttempts = 30;
+    function tryReload() {
+        attempts++;
+        fetch('/api/health').then(function(r) {
+            if (r.ok) {
+                window.location.reload();
+            } else {
+                retry();
+            }
+        }).catch(function() {
+            retry();
+        });
+    }
+    function retry() {
+        if (attempts < maxAttempts) {
+            setTimeout(tryReload, 1000);
+        } else {
+            var progress = document.getElementById('update-modal-progress');
+            if (progress) {
+                var el = document.createElement('div');
+                el.className = 'text-warning';
+                el.textContent = 'Could not reconnect. Please reload the page manually.';
+                progress.appendChild(el);
+            }
+        }
+    }
+    tryReload();
+}
+
+// Changelog markdown renderer with category icons
+var changelogIcons = {
+    "added":   '<svg class="changelog-icon changelog-icon-added" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    "changed": '<svg class="changelog-icon changelog-icon-changed" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+    "fixed":   '<svg class="changelog-icon changelog-icon-fixed" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    "removed": '<svg class="changelog-icon changelog-icon-removed" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    "what's new": '<svg class="changelog-icon changelog-icon-added" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
+};
+
+function renderMarkdown(text) {
+    var lines = text.split('\n');
+    var html = '';
+    var inList = false;
+    var inSection = false;
+
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+
+        if (/^#{2,3}\s+/.test(line)) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inSection) { html += '</div>'; inSection = false; }
+
+            var heading = line.replace(/^#{2,3}\s+/, '').trim();
+            var key = heading.toLowerCase();
+            var icon = changelogIcons[key] || '';
+
+            html += '<div class="changelog-section">';
+            html += '<h4 class="changelog-heading">' + icon + escapeHtml(heading) + '</h4>';
+            inSection = true;
+        } else if (/^[-*]\s+/.test(line)) {
+            if (!inList) { html += '<ul class="changelog-list">'; inList = true; }
+            var content = line.replace(/^[-*]\s+/, '');
+            var rendered = escapeHtml(content).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html += '<li>' + rendered + '</li>';
+        } else if (line.trim() === '') {
+            if (inList) { html += '</ul>'; inList = false; }
+        } else if (line.trim()) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += '<p class="changelog-text">' + escapeHtml(line) + '</p>';
+        }
+    }
+    if (inList) html += '</ul>';
+    if (inSection) html += '</div>';
+
+    if (!html.trim()) {
+        html = '<p class="text-muted">No release notes available.</p>';
+    }
+    return html;
+}
+
+function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
 
 // AnsiUp instance for ANSI color rendering
 let ansiUp = null;
@@ -115,50 +311,132 @@ function confirmAction(title, message, confirmText, confirmClass, onConfirm) {
     modal.showModal();
 }
 
-// SSE stream handler for operation progress
+// SSE stream handler for operation progress (supports both GET and POST)
 function startSSE(url, opts) {
     opts = opts || {};
+    var method = opts.method || 'GET';
     var panel = document.getElementById('operation-output');
     if (panel) {
         panel.innerHTML = '';
         document.getElementById('operation-panel').classList.remove('hidden');
     }
 
-    var source = new EventSource(url);
+    if (method === 'GET') {
+        var source = new EventSource(url);
 
-    source.onmessage = function(e) {
-        if (!panel) return;
-        var converter = getAnsiUp();
-        var line = document.createElement('div');
-        line.innerHTML = safeAnsiHtml(converter, e.data);
-        panel.appendChild(line);
-        panel.scrollTop = panel.scrollHeight;
-    };
+        source.onmessage = function(e) {
+            if (!panel) return;
+            var converter = getAnsiUp();
+            var line = document.createElement('div');
+            line.innerHTML = safeAnsiHtml(converter, e.data);
+            panel.appendChild(line);
+            panel.scrollTop = panel.scrollHeight;
+        };
 
-    source.addEventListener('done', function(e) {
-        source.close();
+        source.addEventListener('done', function(e) {
+            source.close();
+            if (panel) {
+                var banner = document.createElement('div');
+                banner.className = 'text-success font-semibold mt-2';
+                banner.textContent = e.data || 'Operation completed successfully';
+                panel.appendChild(banner);
+            }
+            showToast(opts.successMessage || 'Operation completed', 'success');
+            htmx.trigger(document.body, 'refreshServices');
+        });
+
+        source.addEventListener('app-error', function(e) {
+            source.close();
+            if (panel) {
+                var banner = document.createElement('div');
+                banner.className = 'text-error font-semibold mt-2';
+                banner.textContent = e.data || 'Operation failed';
+                panel.appendChild(banner);
+            }
+            showToast(opts.errorMessage || 'Operation failed', 'error');
+        });
+
+        return source;
+    }
+
+    // POST-based SSE: use fetch + ReadableStream
+    _fetchSSE(url, method, panel, opts);
+}
+
+function _fetchSSE(url, method, panel, opts) {
+    fetch(url, { method: method }).then(function(response) {
+        if (!response.ok) {
+            showToast(opts.errorMessage || 'Operation failed', 'error');
+            return;
+        }
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function processChunk(result) {
+            if (result.done) {
+                // Process remaining buffer
+                if (buffer.trim()) _parseSSEBuffer(buffer, panel, opts);
+                return;
+            }
+            buffer += decoder.decode(result.value, { stream: true });
+            // Split on double newlines (SSE frame boundary)
+            var frames = buffer.split('\n\n');
+            buffer = frames.pop(); // keep incomplete frame
+            for (var i = 0; i < frames.length; i++) {
+                _parseSSEFrame(frames[i].trim(), panel, opts);
+            }
+            return reader.read().then(processChunk);
+        }
+
+        return reader.read().then(processChunk);
+    }).catch(function() {
+        showToast(opts.errorMessage || 'Connection failed', 'error');
+    });
+}
+
+function _parseSSEBuffer(buf, panel, opts) {
+    var frames = buf.split('\n\n');
+    for (var i = 0; i < frames.length; i++) {
+        if (frames[i].trim()) _parseSSEFrame(frames[i].trim(), panel, opts);
+    }
+}
+
+function _parseSSEFrame(frame, panel, opts) {
+    if (!frame) return;
+    var event = 'message';
+    var data = '';
+    var lines = frame.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+        if (lines[i].indexOf('event: ') === 0) event = lines[i].substring(7).trim();
+        else if (lines[i].indexOf('data: ') === 0) data = lines[i].substring(6);
+    }
+
+    if (event === 'done') {
         if (panel) {
             var banner = document.createElement('div');
             banner.className = 'text-success font-semibold mt-2';
-            banner.textContent = e.data || 'Operation completed successfully';
+            banner.textContent = data || 'Operation completed successfully';
             panel.appendChild(banner);
         }
         showToast(opts.successMessage || 'Operation completed', 'success');
         htmx.trigger(document.body, 'refreshServices');
-    });
-
-    source.addEventListener('error', function(e) {
-        source.close();
+    } else if (event === 'app-error') {
         if (panel) {
             var banner = document.createElement('div');
             banner.className = 'text-error font-semibold mt-2';
-            banner.textContent = e.data || 'Operation failed';
+            banner.textContent = data || 'Operation failed';
             panel.appendChild(banner);
         }
         showToast(opts.errorMessage || 'Operation failed', 'error');
-    });
-
-    return source;
+    } else {
+        if (!panel) return;
+        var converter = getAnsiUp();
+        var line = document.createElement('div');
+        line.innerHTML = safeAnsiHtml(converter, data);
+        panel.appendChild(line);
+        panel.scrollTop = panel.scrollHeight;
+    }
 }
 
 // Keyboard shortcuts
@@ -186,6 +464,12 @@ function setActiveNav(page) {
 }
 
 document.addEventListener('click', function(e) {
+    // Close donate dropdown when clicking outside
+    var dropdown = document.querySelector('.donate-dropdown.open');
+    if (dropdown && !dropdown.contains(e.target)) {
+        dropdown.classList.remove('open');
+    }
+
     var navItem = e.target.closest('[data-page]');
     if (!navItem) return;
     setActiveNav(navItem.getAttribute('data-page'));
@@ -199,10 +483,11 @@ function connectToContainer(name) {
 // Navigate to logs page with a specific service pre-selected
 function navigateToLogs(serviceName) {
     htmx.ajax('GET', '/partials/logs', {target: '#main-content', swap: 'innerHTML'}).then(function() {
-        // Wait for Alpine to initialize the log-viewer component, then dispatch event
-        setTimeout(function() {
+        // Dispatch after HTMX finishes settling the swapped DOM
+        document.addEventListener('htmx:afterSettle', function onSettle() {
+            document.removeEventListener('htmx:afterSettle', onSettle);
             document.dispatchEvent(new CustomEvent('open-logs', { detail: { service: serviceName } }));
-        }, 100);
+        });
     });
     history.pushState(null, '', '/logs');
     setActiveNav('/logs');
@@ -236,7 +521,21 @@ document.addEventListener('htmx:afterRequest', function(e) {
     if (!action || !actionMessages[action]) return;
 
     if (e.detail.successful) {
-        showToast(actionMessages[action].ok, 'success');
+        // SSE streams return HTTP 200 even on failure — check the response
+        // body for "event: app-error" to detect errors inside the stream.
+        var responseText = e.detail.xhr.responseText || '';
+        var errorIdx = responseText.indexOf('event: app-error');
+        if (errorIdx !== -1) {
+            var reason = '';
+            var dataPrefix = responseText.indexOf('data: ', errorIdx);
+            if (dataPrefix !== -1) {
+                var lineEnd = responseText.indexOf('\n', dataPrefix);
+                reason = responseText.substring(dataPrefix + 6, lineEnd !== -1 ? lineEnd : undefined).trim();
+            }
+            showToast(actionMessages[action].fail + (reason ? ': ' + reason : ''), 'error');
+        } else {
+            showToast(actionMessages[action].ok, 'success');
+        }
     }
 });
 
@@ -361,7 +660,7 @@ function seederSSE(url, btn, name) {
         if (out) { out.innerHTML = ''; sessionStorage.removeItem('seederLog-' + name); }
         showSeederLog(name);
     } else {
-        document.querySelectorAll('.seeder-card').forEach(function(c) {
+        document.querySelectorAll('.seeder-item').forEach(function(c) {
             var n = c.id.replace('seeder-card-', '');
             setSeederStatus(n, 'running');
             var out = document.getElementById('seeder-log-output-' + n);
@@ -370,54 +669,98 @@ function seederSSE(url, btn, name) {
         });
     }
 
-    var source = new EventSource(url);
-
-    source.onmessage = function(e) {
+    function onData(data) {
         if (name) {
-            appendSeederLog(name, e.data);
+            appendSeederLog(name, data);
         } else {
-            var match = e.data.match(/^\[([^\]]+)\]/);
-            if (match) appendSeederLog(match[1], e.data);
+            var match = data.match(/^\[([^\]]+)\]/);
+            if (match) appendSeederLog(match[1], data);
         }
-    };
+    }
 
-    source.addEventListener('done', function(e) {
-        source.close();
+    function onDone(data) {
         btn.disabled = false;
         if (btn.querySelector('span')) btn.querySelector('span').textContent = originalText;
         if (name) {
             setSeederStatus(name, 'success');
-            appendSeederLog(name, '✓ ' + (e.data || 'completed'));
+            appendSeederLog(name, '✓ ' + (data || 'completed'));
             showToast('Seeder completed', 'success');
         } else {
-            document.querySelectorAll('.seeder-card').forEach(function(c) {
+            document.querySelectorAll('.seeder-item').forEach(function(c) {
                 setSeederStatus(c.id.replace('seeder-card-', ''), 'success');
             });
             showToast('Seeders completed', 'success');
         }
-    });
+    }
 
-    source.addEventListener('error', function(e) {
-        source.close();
+    function onError(data) {
         btn.disabled = false;
         if (btn.querySelector('span')) btn.querySelector('span').textContent = originalText;
         showToast('Seeder failed', 'error');
         if (name) {
             setSeederStatus(name, 'error');
-            appendSeederLog(name, '✗ ' + (e.data || 'failed'));
+            appendSeederLog(name, '✗ ' + (data || 'failed'));
         } else {
-            var errMatch = e.data ? e.data.match(/seeder "([^"]+)"/) : null;
+            var errMatch = data ? data.match(/seeder "([^"]+)"/) : null;
             var failedName = errMatch ? errMatch[1] : null;
-            document.querySelectorAll('.seeder-card').forEach(function(c) {
+            document.querySelectorAll('.seeder-item').forEach(function(c) {
                 var n = c.id.replace('seeder-card-', '');
                 if (n === failedName) {
                     setSeederStatus(n, 'error');
-                    appendSeederLog(n, '✗ ' + (e.data || 'failed'));
+                    appendSeederLog(n, '✗ ' + (data || 'failed'));
                 } else if (c.classList.contains('seeder-running')) {
                     setSeederStatus(n, 'idle');
                 }
             });
         }
+    }
+
+    fetch(url, { method: 'POST' }).then(function(response) {
+        if (!response.ok) {
+            onError('request failed: ' + response.status);
+            return;
+        }
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function processChunk(result) {
+            if (result.done) {
+                if (buffer.trim()) processFrames(buffer);
+                return;
+            }
+            buffer += decoder.decode(result.value, { stream: true });
+            var frames = buffer.split('\n\n');
+            buffer = frames.pop();
+            for (var i = 0; i < frames.length; i++) {
+                if (frames[i].trim()) processFrame(frames[i].trim());
+            }
+            return reader.read().then(processChunk);
+        }
+
+        function processFrames(buf) {
+            var parts = buf.split('\n\n');
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].trim()) processFrame(parts[i].trim());
+            }
+        }
+
+        function processFrame(frame) {
+            var event = 'message';
+            var data = '';
+            var lines = frame.split('\n');
+            for (var i = 0; i < lines.length; i++) {
+                if (lines[i].indexOf('event: ') === 0) event = lines[i].substring(7).trim();
+                else if (lines[i].indexOf('data: ') === 0) data = lines[i].substring(6);
+            }
+            if (event === 'done') onDone(data);
+            else if (event === 'app-error') onError(data);
+            else onData(data);
+        }
+
+        return reader.read().then(processChunk);
+    }).catch(function() {
+        onError('connection failed');
     });
 }
 

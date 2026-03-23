@@ -10,12 +10,12 @@ type SystemMetrics struct {
 	Containers []ContainerStats `json:"containers"`
 }
 
-// CPUMetrics holds CPU usage information from /proc/stat.
+// CPUMetrics holds CPU usage information.
 type CPUMetrics struct {
 	UsagePercent float64 `json:"usage_percent"`
 }
 
-// MemoryMetrics holds RAM usage information from /proc/meminfo.
+// MemoryMetrics holds RAM usage information.
 type MemoryMetrics struct {
 	TotalBytes     uint64  `json:"total_bytes"`
 	UsedBytes      uint64  `json:"used_bytes"`
@@ -23,7 +23,7 @@ type MemoryMetrics struct {
 	UsagePercent   float64 `json:"usage_percent"`
 }
 
-// DiskMetrics holds disk usage information from syscall.Statfs.
+// DiskMetrics holds disk usage information.
 type DiskMetrics struct {
 	TotalBytes     uint64  `json:"total_bytes"`
 	UsedBytes      uint64  `json:"used_bytes"`
@@ -31,14 +31,14 @@ type DiskMetrics struct {
 	UsagePercent   float64 `json:"usage_percent"`
 }
 
-// LoadAvgMetrics holds load average from /proc/loadavg.
+// LoadAvgMetrics holds load average.
 type LoadAvgMetrics struct {
 	Load1  float64 `json:"load1"`
 	Load5  float64 `json:"load5"`
 	Load15 float64 `json:"load15"`
 }
 
-// UptimeMetrics holds host uptime from /proc/uptime.
+// UptimeMetrics holds host uptime.
 type UptimeMetrics struct {
 	UptimeSeconds float64 `json:"uptime_seconds"`
 }

@@ -15,6 +15,14 @@ import (
 	"github.com/getkaze/keel/internal/model"
 )
 
+// healthHTTPClient is a shared client reused across all HTTP health checks.
+var healthHTTPClient = &http.Client{
+	Timeout: 5 * time.Second,
+	Transport: &http.Transport{
+		IdleConnTimeout: 30 * time.Second,
+	},
+}
+
 // HealthResult holds the health check result for a single service.
 type HealthResult struct {
 	Name    string                `json:"name"`
@@ -102,12 +110,11 @@ func runCommandCheck(ctx context.Context, ci *docker.ContainerInfo, command stri
 }
 
 func runHTTPCheck(ctx context.Context, url string) (bool, string, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return false, "", err
 	}
-	resp, err := client.Do(req)
+	resp, err := healthHTTPClient.Do(req)
 	if err != nil {
 		log.Printf("health http check %s: %v", url, err)
 		return false, "", nil

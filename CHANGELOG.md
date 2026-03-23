@@ -9,6 +9,47 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- CmdRunner abstraction — local and remote Docker execution behind a unified interface (@mateusmetzker)
+- LocalRunner and ReloadableRunner with hot-swap support for target config changes (@mateusmetzker)
+- SSH utilities extracted into `internal/ssh` package, shared across all SSH consumers (@mateusmetzker)
+- TunnelMonitor with automatic reconnection, exponential backoff, and health checks (@mateusmetzker)
+- SSE endpoint for tunnel status (`GET /api/tunnel/status`) with live status dot in the topbar (@mateusmetzker)
+- Label-based container detection (`keel.managed=true`) with network fallback for backward compatibility (@mateusmetzker)
+- Semver comparison in updater — correctly handles `0.10.0 > 0.9.0` (@mateusmetzker)
+- Cross-device-safe updater — temp file created in same directory as binary (@mateusmetzker)
+- IP validation for `keel hosts setup` — rejects invalid addresses before modifying `/etc/hosts` (@mateusmetzker)
+- Body size limits: 64 KB for service creation, 1 MB for config save (@mateusmetzker)
+- CI workflow with `go test -race` on push/PR; test job added as prerequisite in release workflow (@mateusmetzker)
+- 155 unit tests across all packages (@mateusmetzker)
+- Dual donate options: Stripe for Brazilian supporters, Buy Me a Coffee for international (@mateusmetzker)
+
+### Changed
+
+- Migrated local metrics (CPU, memory, disk, load average, uptime) from manual `/proc` parsing to gopsutil v4 (@mateusmetzker)
+- `start-all`, `stop-all`, and seeder run endpoints changed from GET to POST (@mateusmetzker)
+- SSE error events renamed from `error` to `app-error` to avoid conflicts with `EventSource.onerror` (@mateusmetzker)
+- SSE streams now support POST via `fetch + ReadableStream` for mutation endpoints (@mateusmetzker)
+- Template rendering buffered — errors return clean HTTP 500 instead of partial HTML (@mateusmetzker)
+- Health check handler reuses a shared `http.Client` instead of creating one per request (@mateusmetzker)
+- Remote metrics cached for 10 seconds with background refresh — no more blocking SSH calls per HTTP request (@mateusmetzker)
+- Log navigation uses `htmx:afterSettle` instead of `setTimeout` for reliable service pre-selection (@mateusmetzker)
+- GHCR login now pipes PAT over stdin instead of shell interpolation (@mateusmetzker)
+- SSH options hardened: `StrictHostKeyChecking=accept-new` replaces `StrictHostKeyChecking=no` (@mateusmetzker)
+- WebSocket origin check validates same-host/localhost instead of accepting all origins (@mateusmetzker)
+
+### Fixed
+
+- Terminal deadlock: `Session.Close` is now idempotent via `sync.Once`; close called before `wg.Wait` (@mateusmetzker)
+- Terminal ANSI clear race condition: moved from server-side PTY write to client-side `term.clear()` on WebSocket open (@mateusmetzker)
+- Update toast now shows error details when pull fails, instead of always showing "UPDATE COMPLETE" (@mateusmetzker)
+- Log viewer path traversal: file paths validated against configured log source directories (@mateusmetzker)
+- Config editor: `saveServiceConfig` uses `io.ReadAll` + `json.Valid` instead of broken `fmt.Fscan` (@mateusmetzker)
+- Destructive update prevention: failed `docker pull` no longer removes the running container (@mateusmetzker)
+- Seeder card CSS selector corrected from `.seeder-card` to `.seeder-item` (@mateusmetzker)
+- Executor `dockerStream` gains idle timeout and non-blocking channel sends with log-on-drop (@mateusmetzker)
+
 ---
 
 ## [0.2] — 2026-03-15

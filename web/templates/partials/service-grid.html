@@ -10,14 +10,14 @@
         <div class="page-actions">
             {{if .HasStopped}}
             <button class="btn btn-primary sm"
-                    onclick="this.disabled=true;this.querySelector('span').textContent='starting...';startSSE('/api/services/start-all',{successMessage:'All services started'});">
+                    onclick="this.disabled=true;this.querySelector('span').textContent='starting...';startSSE('/api/services/start-all',{method:'POST',successMessage:'All services started'});">
                 <svg class="icon-sm"><use href="/static/lucide-sprite.svg#play"></use></svg>
                 <span>Start all</span>
             </button>
             {{end}}
             {{if .HasRunning}}
             <button class="btn btn-ghost sm"
-                    onclick="if(!confirm('Stop all running containers?'))return;this.disabled=true;this.querySelector('span').textContent='stopping...';startSSE('/api/services/stop-all',{successMessage:'All services stopped'});">
+                    onclick="if(!confirm('Stop all running containers?'))return;this.disabled=true;this.querySelector('span').textContent='stopping...';startSSE('/api/services/stop-all',{method:'POST',successMessage:'All services stopped'});">
                 <svg class="icon-sm"><use href="/static/lucide-sprite.svg#square"></use></svg>
                 <span>Stop all</span>
             </button>

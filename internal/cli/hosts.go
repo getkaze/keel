@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,6 +38,9 @@ func runHostsSetup(args []string, keelDir string) {
 	for i, a := range args {
 		if a == "--ip" && i+1 < len(args) {
 			ip = args[i+1]
+			if net.ParseIP(ip) == nil {
+				fatalf("invalid IP address: %s", ip)
+			}
 			break
 		}
 	}

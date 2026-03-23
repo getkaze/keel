@@ -69,7 +69,7 @@ func (h *LogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if source != "" {
 		logSource := findLogSource(svc.Logs, source)
 		if logSource == nil {
-			fmt.Fprintf(w, "event: error\ndata: unknown log source: %s\n\n", source)
+			fmt.Fprintf(w, "event: app-error\ndata: unknown log source: %s\n\n", source)
 			flusher.Flush()
 			return
 		}
@@ -97,22 +97,40 @@ func (h *LogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Build docker command based on source type.
 	var cmdArgs []string
 	if filePath != "" {
-		cmdArgs = []string{"exec", containerName, "tail", "-n", strconv.Itoa(lines), "-f", filePath}
+		// Validate filePath: must contain no traversal and must be within a
+		// configured log source path for this service.
+		cleanFile := path.Clean(filePath)
+		if strings.Contains(cleanFile, "..") {
+			http.Error(w, "invalid file path", http.StatusBadRequest)
+			return
+		}
+		allowed := false
+		for _, ls := range svc.Logs {
+			if ls.Path != "" && strings.HasPrefix(cleanFile, path.Clean(ls.Path)) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			http.Error(w, "file path not within allowed log directory", http.StatusBadRequest)
+			return
+		}
+		cmdArgs = []string{"exec", containerName, "tail", "-n", strconv.Itoa(lines), "-f", cleanFile}
 	} else if source != "" {
 		logSource := findLogSource(svc.Logs, source)
 		if logSource == nil {
-			fmt.Fprintf(w, "event: error\ndata: unknown log source: %s\n\n", source)
+			fmt.Fprintf(w, "event: app-error\ndata: unknown log source: %s\n\n", source)
 			flusher.Flush()
 			return
 		}
 		if logSource.Type != "file" || logSource.Path == "" {
-			fmt.Fprintf(w, "event: error\ndata: log source has no file path\n\n")
+			fmt.Fprintf(w, "event: app-error\ndata: log source has no file path\n\n")
 			flusher.Flush()
 			return
 		}
 		// Check if path is a directory — require a file selection.
 		if isContainerDir(ctx, containerName, logSource.Path) {
-			fmt.Fprintf(w, "event: error\ndata: select a file from the dropdown\n\n")
+			fmt.Fprintf(w, "event: app-error\ndata: select a file from the dropdown\n\n")
 			flusher.Flush()
 			return
 		}
@@ -127,7 +145,7 @@ func (h *LogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func streamCmd(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, cmd *exec.Cmd) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		fmt.Fprintf(w, "event: error\ndata: failed to create pipe: %s\n\n", err)
+		fmt.Fprintf(w, "event: app-error\ndata: failed to create pipe: %s\n\n", err)
 		flusher.Flush()
 		return
 	}
@@ -135,7 +153,7 @@ func streamCmd(ctx context.Context, w http.ResponseWriter, flusher http.Flusher,
 
 	if err := cmd.Start(); err != nil {
 		stdout.Close()
-		fmt.Fprintf(w, "event: error\ndata: failed to start: %s\n\n", err)
+		fmt.Fprintf(w, "event: app-error\ndata: failed to start: %s\n\n", err)
 		flusher.Flush()
 		return
 	}
@@ -146,7 +164,7 @@ func streamCmd(ctx context.Context, w http.ResponseWriter, flusher http.Flusher,
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintf(w, "event: error\ndata: stream timeout\n\n")
+			fmt.Fprintf(w, "event: app-error\ndata: stream timeout\n\n")
 			flusher.Flush()
 			return
 		default:
@@ -298,8 +316,18 @@ func isContainerDir(ctx context.Context, containerName, path string) bool {
 }
 
 // isWithinDir returns true if p is inside (or equal to) dir.
+// Symlinks are resolved before checking containment.
 func isWithinDir(p, dir string) bool {
-	rel, err := filepath.Rel(dir, p)
+	realP, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		// If the file doesn't exist yet, fall back to Clean.
+		realP = filepath.Clean(p)
+	}
+	realDir, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		realDir = filepath.Clean(dir)
+	}
+	rel, err := filepath.Rel(realDir, realP)
 	return err == nil && !strings.HasPrefix(rel, "..")
 }
 

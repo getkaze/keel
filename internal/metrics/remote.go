@@ -2,20 +2,41 @@ package metrics
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/getkaze/keel/internal/config"
 	"github.com/getkaze/keel/internal/model"
+	keelssh "github.com/getkaze/keel/internal/ssh"
 )
+
+const (
+	cacheTTL       = 10 * time.Second
+	sshExecTimeout = 5 * time.Second
+)
+
+type cachedMetrics struct {
+	cpu    model.CPUMetrics
+	mem    model.MemoryMetrics
+	disk   model.DiskMetrics
+	load   model.LoadAvgMetrics
+	uptime model.UptimeMetrics
+	err    error
+	at     time.Time
+}
 
 // RemoteCollector reads system metrics from a remote host via SSH.
 type RemoteCollector struct {
 	target *config.TargetConfig
+
+	mu       sync.RWMutex
+	cache    *cachedMetrics
+	fetching bool
 }
 
 // NewRemoteCollector creates a collector for the given remote target.
@@ -23,9 +44,90 @@ func NewRemoteCollector(target *config.TargetConfig) *RemoteCollector {
 	return &RemoteCollector{target: target}
 }
 
+// SetTarget updates the remote target and invalidates the cache.
+func (rc *RemoteCollector) SetTarget(target *config.TargetConfig) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.target = target
+	rc.cache = nil
+	rc.fetching = false
+}
+
 // ReadAll collects CPU, memory, disk, load average, and uptime from the remote host
-// in a single SSH call to minimize latency.
+// in a single SSH call to minimize latency. Results are cached for 10 seconds;
+// expired cache triggers a background refresh while returning stale data.
 func (rc *RemoteCollector) ReadAll() (model.CPUMetrics, model.MemoryMetrics, model.DiskMetrics, model.LoadAvgMetrics, model.UptimeMetrics, error) {
+	rc.mu.RLock()
+	c := rc.cache
+	rc.mu.RUnlock()
+
+	if c != nil && time.Since(c.at) < cacheTTL {
+		return c.cpu, c.mem, c.disk, c.load, c.uptime, c.err
+	}
+
+	// Cache expired or empty — check if a background fetch is already running.
+	rc.mu.Lock()
+	if rc.fetching {
+		// Another goroutine is already fetching; return stale data if available.
+		c = rc.cache
+		rc.mu.Unlock()
+		if c != nil {
+			return c.cpu, c.mem, c.disk, c.load, c.uptime, c.err
+		}
+		// No stale data — do a blocking fetch.
+		return rc.fetchAndCache()
+	}
+
+	if rc.cache != nil && time.Since(rc.cache.at) < cacheTTL {
+		// Re-check after acquiring write lock — another goroutine may have refreshed.
+		c = rc.cache
+		rc.mu.Unlock()
+		return c.cpu, c.mem, c.disk, c.load, c.uptime, c.err
+	}
+
+	hasStale := rc.cache != nil
+	rc.fetching = true
+	rc.mu.Unlock()
+
+	if hasStale {
+		// Return stale data immediately, refresh in background.
+		go func() {
+			defer func() {
+				rc.mu.Lock()
+				rc.fetching = false
+				rc.mu.Unlock()
+			}()
+			rc.fetchAndCache()
+		}()
+		rc.mu.RLock()
+		c = rc.cache
+		rc.mu.RUnlock()
+		return c.cpu, c.mem, c.disk, c.load, c.uptime, c.err
+	}
+
+	// First call ever — blocking fetch.
+	cpu, mem, disk, load, uptime, err := rc.fetchAndCache()
+	rc.mu.Lock()
+	rc.fetching = false
+	rc.mu.Unlock()
+	return cpu, mem, disk, load, uptime, err
+}
+
+func (rc *RemoteCollector) fetchAndCache() (model.CPUMetrics, model.MemoryMetrics, model.DiskMetrics, model.LoadAvgMetrics, model.UptimeMetrics, error) {
+	cpu, mem, disk, load, uptime, err := rc.fetchRemote()
+
+	rc.mu.Lock()
+	rc.cache = &cachedMetrics{
+		cpu: cpu, mem: mem, disk: disk,
+		load: load, uptime: uptime,
+		err: err, at: time.Now(),
+	}
+	rc.mu.Unlock()
+
+	return cpu, mem, disk, load, uptime, err
+}
+
+func (rc *RemoteCollector) fetchRemote() (model.CPUMetrics, model.MemoryMetrics, model.DiskMetrics, model.LoadAvgMetrics, model.UptimeMetrics, error) {
 	// Single command that reads all proc files + disk usage.
 	// Two CPU samples 1 second apart for usage calculation.
 	script := `cat /proc/stat | head -1; sleep 1; cat /proc/stat | head -1; cat /proc/meminfo; echo '---LOADAVG---'; cat /proc/loadavg; echo '---UPTIME---'; cat /proc/uptime; echo '---DISK---'; df -B1 / | tail -1`
@@ -39,11 +141,14 @@ func (rc *RemoteCollector) ReadAll() (model.CPUMetrics, model.MemoryMetrics, mod
 }
 
 func (rc *RemoteCollector) sshExec(cmd string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), sshExecTimeout)
+	defer cancel()
+
 	args := buildSSHArgs(rc.target)
 	args = append(args, cmd)
 
 	var stdout, stderr bytes.Buffer
-	c := exec.Command("ssh", args...)
+	c := exec.CommandContext(ctx, "ssh", args...)
 	c.Stdout = &stdout
 	c.Stderr = &stderr
 
@@ -54,33 +159,7 @@ func (rc *RemoteCollector) sshExec(cmd string) (string, error) {
 }
 
 func buildSSHArgs(t *config.TargetConfig) []string {
-	args := []string{
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=5",
-	}
-	if t.SSHKey != "" {
-		args = append(args, "-i", expandHome(t.SSHKey))
-	}
-	if t.SSHJump != "" {
-		proxyCmd := "ssh -o StrictHostKeyChecking=no -o BatchMode=yes"
-		if t.SSHKey != "" {
-			proxyCmd += " -i " + expandHome(t.SSHKey)
-		}
-		proxyCmd += " -W %h:%p " + t.SSHJump
-		args = append(args, "-o", "ProxyCommand="+proxyCmd)
-	}
-	args = append(args, t.SSHUser+"@"+t.Host)
-	return args
-}
-
-func expandHome(path string) string {
-	if strings.HasPrefix(path, "~/") {
-		if home, err := os.UserHomeDir(); err == nil {
-			return filepath.Join(home, path[2:])
-		}
-	}
-	return path
+	return keelssh.BuildArgs(t)
 }
 
 func parseRemoteMetrics(raw string) (model.CPUMetrics, model.MemoryMetrics, model.DiskMetrics, model.LoadAvgMetrics, model.UptimeMetrics, error) {

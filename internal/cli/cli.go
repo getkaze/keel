@@ -491,7 +491,6 @@ Dashboard flags:
   -bind <addr>                              bind address (default 127.0.0.1)
   -keel-dir <path>                      data directory (default: OS-dependent)
   -dev                                      serve web assets from filesystem (dev mode)
-  -open                                     open browser after starting
 
 Environment:
   KEEL_DIR                              data directory override for CLI commands
@@ -507,6 +506,6 @@ Examples:
   keel stop traefik                     stop traefik
   keel reset --all                      recreate all containers from services/*.json
   keel reset redis                      recreate only redis
-  keel dev mchtracker ~/projects/mchtracker   run mchtracker with local code + hot reload
+  keel dev api ~/projects/api   		run api with local code + hot reload
 `, version)
 }

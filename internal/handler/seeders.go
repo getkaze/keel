@@ -31,8 +31,8 @@ type SeederDeps struct {
 // RegisterSeederRoutes wires up all seeder-related routes.
 func RegisterSeederRoutes(mux *http.ServeMux, deps *SeederDeps) {
 	mux.HandleFunc("GET /api/seeders", deps.listSeeders)
-	mux.HandleFunc("GET /api/seeders/run", deps.runAll)
-	mux.HandleFunc("GET /api/seeders/run/{name}", deps.runOne)
+	mux.HandleFunc("POST /api/seeders/run", deps.runAll)
+	mux.HandleFunc("POST /api/seeders/run/{name}", deps.runOne)
 	mux.HandleFunc("GET /api/seeders/config/{name}", deps.getSeederConfig)
 }
 
@@ -114,7 +114,7 @@ func (d *SeederDeps) runAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := <-errc; err != nil {
-		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+		fmt.Fprintf(w, "event: app-error\ndata: %s\n\n", err.Error())
 	} else {
 		fmt.Fprintf(w, "event: done\ndata: all seeders completed\n\n")
 	}
@@ -165,7 +165,7 @@ func (d *SeederDeps) runOne(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := <-errc; err != nil {
-		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+		fmt.Fprintf(w, "event: app-error\ndata: %s\n\n", err.Error())
 	} else {
 		fmt.Fprintf(w, "event: done\ndata: seeder %s completed\n\n", name)
 	}

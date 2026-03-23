@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"html/template"
 	"log"
@@ -23,6 +24,20 @@ type PageDeps struct {
 	Version        string
 	Remote         *metrics.RemoteCollector // nil for local targets
 	SeederExecutor *docker.SeederExecutor
+}
+
+// renderTemplate executes a template into a buffer first. Only on success
+// is the content written to w. On failure, a clean HTTP 500 is returned
+// instead of partial HTML.
+func (d *PageDeps) renderTemplate(w http.ResponseWriter, name string, data any) {
+	var buf bytes.Buffer
+	if err := d.Tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+		log.Printf("template error: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	buf.WriteTo(w)
 }
 
 // RegisterPageRoutes wires up page rendering routes.
@@ -89,16 +104,12 @@ func (d *PageDeps) overviewPartial(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Tmpl.ExecuteTemplate(w, "service-grid", map[string]any{
+	d.renderTemplate(w, "service-grid", map[string]any{
 		"Services":   views,
 		"Groups":     groups,
 		"HasRunning": hasRunning,
 		"HasStopped": hasStopped,
-	}); err != nil {
-		log.Printf("template error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	})
 }
 
 func (d *PageDeps) logsPartial(w http.ResponseWriter, r *http.Request) {
@@ -114,14 +125,10 @@ func (d *PageDeps) logsPartial(w http.ResponseWriter, r *http.Request) {
 	}
 	servicesJSON, _ := json.Marshal(svcMap)
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Tmpl.ExecuteTemplate(w, "log-viewer", map[string]any{
+	d.renderTemplate(w, "log-viewer", map[string]any{
 		"Services":     services,
 		"ServicesJSON": template.JS(servicesJSON),
-	}); err != nil {
-		log.Printf("template error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	})
 }
 
 // ServiceDetailView carries all data needed to render a container detail page.
@@ -163,11 +170,7 @@ func (d *PageDeps) serviceDetailPartial(w http.ResponseWriter, r *http.Request) 
 		HasHostLogs: hasHostLogs,
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Tmpl.ExecuteTemplate(w, "service-detail", view); err != nil {
-		log.Printf("template error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	d.renderTemplate(w, "service-detail", view)
 }
 
 func (d *PageDeps) serviceNewPartial(w http.ResponseWriter, r *http.Request) {
@@ -177,13 +180,9 @@ func (d *PageDeps) serviceNewPartial(w http.ResponseWriter, r *http.Request) {
 		network = cfg.Network
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Tmpl.ExecuteTemplate(w, "service-new", map[string]any{
+	d.renderTemplate(w, "service-new", map[string]any{
 		"DefaultNetwork": network,
-	}); err != nil {
-		log.Printf("template error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	})
 }
 
 func (d *PageDeps) metricsPartial(w http.ResponseWriter, r *http.Request) {
@@ -246,11 +245,7 @@ func (d *PageDeps) metricsPartial(w http.ResponseWriter, r *http.Request) {
 		CPU: cpu, Memory: mem, Disk: disk,
 		LoadAvg: loadAvg, Uptime: uptime, Containers: containers,
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Tmpl.ExecuteTemplate(w, "metrics-panel", data); err != nil {
-		log.Printf("template error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	d.renderTemplate(w, "metrics-panel", data)
 }
 
 func (d *PageDeps) metricsMiniPartial(w http.ResponseWriter, r *http.Request) {
@@ -269,10 +264,7 @@ func (d *PageDeps) metricsMiniPartial(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := model.SystemMetrics{CPU: cpu, Memory: mem, Disk: disk}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Tmpl.ExecuteTemplate(w, "metrics-mini", data); err != nil {
-		log.Printf("metrics-mini template error: %v", err)
-	}
+	d.renderTemplate(w, "metrics-mini", data)
 }
 
 // SeederGroupView groups seeders by their target service.
@@ -333,21 +325,13 @@ func (d *PageDeps) seedersPartial(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Tmpl.ExecuteTemplate(w, "seeders", map[string]any{
+	d.renderTemplate(w, "seeders", map[string]any{
 		"Groups": groups,
-	}); err != nil {
-		log.Printf("seeders template error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	})
 }
 
 func (d *PageDeps) settingsPartial(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Tmpl.ExecuteTemplate(w, "settings", map[string]any{
+	d.renderTemplate(w, "settings", map[string]any{
 		"Version": d.Version,
-	}); err != nil {
-		log.Printf("settings template error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	})
 }

@@ -222,7 +222,7 @@ function logViewer() {
                 }
             };
 
-            this.eventSource.addEventListener('error', (e) => {
+            this.eventSource.addEventListener('app-error', (e) => {
                 this.streaming = false;
                 if (e.data) {
                     var line = document.createElement('div');

@@ -5,6 +5,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -14,10 +16,33 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		// Single-user local dashboard — allow all origins
+	CheckOrigin: checkWSOrigin,
+}
+
+// checkWSOrigin validates the Origin header for WebSocket upgrade requests.
+// Allows: same-host origin, localhost/127.0.0.1 on same port, empty origin (non-browser clients).
+func checkWSOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true // non-browser clients
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	originHost := u.Hostname()
+	requestHost := r.Host
+	// Strip port from request host for comparison
+	if idx := strings.LastIndex(requestHost, ":"); idx != -1 {
+		requestHost = requestHost[:idx]
+	}
+	if originHost == requestHost {
 		return true
-	},
+	}
+	if originHost == "localhost" || originHost == "127.0.0.1" || originHost == "::1" {
+		return true
+	}
+	return false
 }
 
 // controlMessage is a JSON control frame for terminal resize.
@@ -77,7 +102,12 @@ func serveTerminalWS(w http.ResponseWriter, r *http.Request, newSession func() (
 			websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "failed to create terminal session"))
 		return
 	}
-	defer sess.Close()
+
+	// Close session on app context cancellation (server shutdown).
+	go func() {
+		<-r.Context().Done()
+		sess.Close()
+	}()
 
 	// Mutex protects concurrent WebSocket writes from the PTY goroutine
 	// and the main read loop (which sends close frames).
@@ -111,7 +141,6 @@ func serveTerminalWS(w http.ResponseWriter, r *http.Request, newSession func() (
 	}()
 
 	// WebSocket -> PTY stdin (binary) or control (text/JSON)
-	firstResize := true
 	for {
 		msgType, data, err := conn.ReadMessage()
 		if err != nil {
@@ -134,15 +163,12 @@ func serveTerminalWS(w http.ResponseWriter, r *http.Request, newSession func() (
 			}
 			if ctrl.Type == "resize" && ctrl.Cols > 0 && ctrl.Rows > 0 {
 				sess.Resize(ctrl.Rows, ctrl.Cols)
-				// After the first resize from the client, clear the screen
-				// so the prompt renders at the top with correct dimensions.
-				if firstResize {
-					firstResize = false
-					sess.ClearScreen()
-				}
 			}
 		}
 	}
 
+	// Close the session BEFORE waiting for the reader goroutine.
+	// This causes PTY.Read() to return io.EOF, unblocking the reader.
+	sess.Close()
 	wg.Wait()
 }
