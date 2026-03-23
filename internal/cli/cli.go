@@ -506,6 +506,6 @@ Examples:
   keel stop traefik                     stop traefik
   keel reset --all                      recreate all containers from services/*.json
   keel reset redis                      recreate only redis
-  keel dev mchtracker ~/projects/mchtracker   run mchtracker with local code + hot reload
+  keel dev api ~/projects/api   		run api with local code + hot reload
 `, version)
 }
