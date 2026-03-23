@@ -39,7 +39,7 @@ func NewStatusPoller() *StatusPoller {
 	}
 }
 
-// ListContainers returns all containers on keel-net, using cache if fresh.
+// ListContainers returns all Keel-managed containers (by label or keel-net network), using cache if fresh.
 func (p *StatusPoller) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
 	p.mu.RLock()
 	if time.Now().Before(p.expiry) {
@@ -71,10 +71,25 @@ func fetchContainers(ctx context.Context) ([]ContainerInfo, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "ps", "-a",
-		"--filter", "network=keel-net",
-		"--format", "json",
-	)
+	// Query by label (new containers) and by network (legacy containers).
+	byLabel, err := dockerPS(ctx, "--filter", "label=keel.managed=true")
+	if err != nil {
+		return nil, err
+	}
+	byNetwork, err := dockerPS(ctx, "--filter", "network=keel-net")
+	if err != nil {
+		return nil, err
+	}
+
+	return mergeContainers(byLabel, byNetwork), nil
+}
+
+// dockerPS runs "docker ps -a --format json" with extra filter args.
+func dockerPS(ctx context.Context, filters ...string) ([]ContainerInfo, error) {
+	args := []string{"ps", "-a", "--format", "json"}
+	args = append(args, filters...)
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -103,6 +118,21 @@ func fetchContainers(ctx context.Context) ([]ContainerInfo, error) {
 	}
 
 	return containers, nil
+}
+
+// mergeContainers deduplicates containers from multiple sources by ID.
+func mergeContainers(lists ...[]ContainerInfo) []ContainerInfo {
+	seen := make(map[string]bool)
+	var result []ContainerInfo
+	for _, list := range lists {
+		for _, c := range list {
+			if !seen[c.ID] {
+				seen[c.ID] = true
+				result = append(result, c)
+			}
+		}
+	}
+	return result
 }
 
 // MatchServiceToContainer finds a container matching a service name or hostname.

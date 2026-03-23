@@ -4,8 +4,19 @@
 set -euo pipefail
 
 BINARY_NAME="keel"
-INSTALL_DIR="/usr/local/bin"
 RELEASES_BASE="https://github.com/getkaze/keel/releases"
+
+# Install directory: user-writable ~/.local/bin preferred, /usr/local/bin as fallback.
+REAL_USER="${SUDO_USER:-$(whoami)}"
+REAL_HOME=$(eval echo "~${REAL_USER}")
+if [ "$(id -u)" = "0" ]; then
+  INSTALL_DIR="${REAL_HOME}/.local/bin"
+  mkdir -p "$INSTALL_DIR"
+  chown "$REAL_USER" "$INSTALL_DIR"
+else
+  INSTALL_DIR="${HOME}/.local/bin"
+  mkdir -p "$INSTALL_DIR"
+fi
 
 # ── color helpers ──────────────────────────────────────────────────────────────
 bold=$(tput bold 2>/dev/null || true)
@@ -18,8 +29,6 @@ ok()    { echo "${green}  ✓${reset} $*"; }
 fail()  { echo "${red}error:${reset} $*" >&2; exit 1; }
 
 # ── sanity checks ─────────────────────────────────────────────────────────────
-[ "$(id -u)" = "0" ] || fail "please run with sudo:\n\n  curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash"
-
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 case "$OS" in
   linux)  ;;
@@ -35,13 +44,13 @@ case "$ARCH" in
   *)       fail "unsupported architecture: $ARCH" ;;
 esac
 
-# Data directory: Linux uses /var/lib/keel, macOS uses ~/.keel
+# Data directory: Linux uses /var/lib/keel (with sudo) or ~/.keel, macOS uses ~/.keel
 if [ "$OS" = "darwin" ]; then
-  REAL_USER="${SUDO_USER:-$(whoami)}"
-  REAL_HOME=$(eval echo "~${REAL_USER}")
   KEEL_DIR="${REAL_HOME}/.keel"
-else
+elif [ "$(id -u)" = "0" ]; then
   KEEL_DIR="/var/lib/keel"
+else
+  KEEL_DIR="${HOME}/.keel"
 fi
 
 # Detect KEEL_VERSION (optional — defaults to latest)
@@ -155,17 +164,30 @@ setup_ghcr() {
 setup_ghcr
 
 # ── ownership ──────────────────────────────────────────────────────────────────
-# Give the calling (non-root) user ownership of the data directory
-# so that `keel target` can be run without sudo.
-REAL_USER="${REAL_USER:-${SUDO_USER:-}}"
-if [ -n "$REAL_USER" ]; then
-  chown -R "${REAL_USER}" "${KEEL_DIR}"
-  ok "ownership of ${KEEL_DIR} set to ${REAL_USER}"
+# Give the calling (non-root) user ownership so keel can self-update without sudo.
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+  chown -R "${SUDO_USER}" "${KEEL_DIR}"
+  chown "${SUDO_USER}" "${INSTALL_DIR}/${BINARY_NAME}"
+  ok "ownership set to ${SUDO_USER} (self-update enabled)"
 fi
 
 # ── done ───────────────────────────────────────────────────────────────────────
 echo ""
 echo "${bold}keel ${VERSION} installed successfully!${reset}"
+
+# Check if install dir is in PATH
+case ":${PATH}:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *)
+    echo ""
+    echo "${bold}Note:${reset} ${INSTALL_DIR} is not in your PATH."
+    echo "  Add it to your shell profile:"
+    echo ""
+    echo "    export PATH=\"${INSTALL_DIR}:\$PATH\""
+    echo ""
+    ;;
+esac
+
 echo ""
 echo "Quick start:"
 echo "  keel target              # show active target"
@@ -175,4 +197,4 @@ echo "  keel stop                # stop all services"
 echo "  keel reset --all         # recreate all containers"
 echo "  keel                     # open the web dashboard (port 60000)"
 echo ""
-echo "Docs: https://getkaze.dev/docs"
+echo "Docs: https://getkaze.dev/keel/docs"

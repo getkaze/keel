@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -18,7 +17,9 @@ import (
 
 	"github.com/getkaze/keel/internal/cli"
 	"github.com/getkaze/keel/internal/config"
+	"github.com/getkaze/keel/internal/docker"
 	"github.com/getkaze/keel/internal/server"
+	"github.com/getkaze/keel/internal/tunnel"
 )
 
 var version = "dev"
@@ -66,21 +67,39 @@ func main() {
 	// socket so that all `docker` commands from the dashboard executor
 	// transparently reach the remote host.
 	target, _ := config.ReadTargetConfig(keelDir)
+	var tunnelMon *tunnel.Monitor
 	if target != nil && target.Mode == "remote" {
-		cleanup := startDockerTunnel(target)
-		defer cleanup()
+		tunnelMon = tunnel.NewMonitor(target)
+		if err := tunnelMon.Start(); err != nil {
+			log.Fatalf("docker tunnel: %v", err)
+		}
+		defer tunnelMon.Stop()
 	}
 
+	// Create the appropriate CmdRunner based on the active target.
+	var inner docker.CmdRunner
+	if target != nil && target.Mode == "remote" {
+		inner = cli.NewRunner(target, keelDir)
+	} else {
+		inner = docker.NewLocalRunner()
+	}
+	runner := docker.NewReloadableRunner(inner)
+
 	srv := server.New(server.Config{
-		Port:     port,
-		Bind:     bind,
-		Dev:      dev,
-		KeelDir:  keelDir,
-		StaticFS: embeddedFS,
-		Version:  version,
-		Ctx:      ctx,
-		Target:   target,
+		Port:      port,
+		Bind:      bind,
+		Dev:       dev,
+		KeelDir:   keelDir,
+		StaticFS:  embeddedFS,
+		Version:   version,
+		Ctx:       ctx,
+		Target:    target,
+		Runner:    runner,
+		Tunnel:    tunnelMon,
 	})
+
+	// Watch target config for changes and hot-reload the runner.
+	go watchTargetConfig(ctx, keelDir, target, runner, &tunnelMon)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	sigCh := make(chan os.Signal, 1)
@@ -111,71 +130,57 @@ func main() {
 	log.Println("Server stopped")
 }
 
-// startDockerTunnel opens an SSH tunnel that forwards the remote Docker socket
-// to a local Unix socket. It sets DOCKER_HOST so all docker commands use it.
-// Returns a cleanup function that kills the tunnel and removes the socket.
-func startDockerTunnel(target *config.TargetConfig) func() {
-	sockPath := filepath.Join(os.TempDir(), fmt.Sprintf("keel-docker-%s.sock", target.Name))
-	_ = os.Remove(sockPath) // remove stale socket
+// watchTargetConfig polls the target config files every 5 seconds and swaps
+// the Runner when the active target changes.
+func watchTargetConfig(ctx context.Context, keelDir string, current *config.TargetConfig, runner *docker.ReloadableRunner, tunnelMon **tunnel.Monitor) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
-	sshArgs := []string{
-		"-nNT",
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "ExitOnForwardFailure=yes",
-		"-o", "LogLevel=ERROR",
-		"-L", sockPath + ":/var/run/docker.sock",
-	}
-	if target.SSHKey != "" {
-		keyPath := target.SSHKey
-		if strings.HasPrefix(keyPath, "~/") {
-			if home, err := os.UserHomeDir(); err == nil {
-				keyPath = filepath.Join(home, keyPath[2:])
+	configHash := targetHash(current)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			newTarget, _ := config.ReadTargetConfig(keelDir)
+			h := targetHash(newTarget)
+			if h == configHash {
+				continue
+			}
+			configHash = h
+			log.Printf("target config changed, reloading (target=%s mode=%s)", newTarget.Name, newTarget.Mode)
+
+			// Swap Runner.
+			if newTarget.Mode == "remote" {
+				runner.Swap(cli.NewRunner(newTarget, keelDir))
+			} else {
+				runner.Swap(docker.NewLocalRunner())
+			}
+
+			// Handle tunnel lifecycle.
+			mon := *tunnelMon
+			if newTarget.Mode == "remote" && mon == nil {
+				newMon := tunnel.NewMonitor(newTarget)
+				if err := newMon.Start(); err != nil {
+					log.Printf("tunnel reload error: %v", err)
+				} else {
+					*tunnelMon = newMon
+				}
+			} else if newTarget.Mode != "remote" && mon != nil {
+				mon.Stop()
+				*tunnelMon = nil
 			}
 		}
-		sshArgs = append(sshArgs, "-i", keyPath)
 	}
-	if target.SSHJump != "" {
-		keyPath := target.SSHKey
-		if strings.HasPrefix(keyPath, "~/") {
-			if home, err := os.UserHomeDir(); err == nil {
-				keyPath = filepath.Join(home, keyPath[2:])
-			}
-		}
-		proxyCmd := "ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o LogLevel=ERROR"
-		if keyPath != "" {
-			proxyCmd += " -i " + keyPath
-		}
-		proxyCmd += " -W %h:%p " + target.SSHJump
-		sshArgs = append(sshArgs, "-o", "ProxyCommand="+proxyCmd)
+}
+
+// targetHash returns a simple string key for detecting config changes.
+func targetHash(t *config.TargetConfig) string {
+	if t == nil {
+		return "local"
 	}
-	sshArgs = append(sshArgs, target.SSHUser+"@"+target.Host)
-
-	cmd := exec.Command("ssh", sshArgs...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Start(); err != nil {
-		log.Fatalf("docker tunnel: failed to start SSH: %v", err)
-	}
-
-	// Wait for the socket to appear (up to 5s).
-	for i := 0; i < 50; i++ {
-		if _, err := os.Stat(sockPath); err == nil {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	os.Setenv("DOCKER_HOST", "unix://"+sockPath)
-	log.Printf("docker tunnel: %s → %s@%s (socket: %s)", target.Name, target.SSHUser, target.Host, sockPath)
-
-	return func() {
-		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
-			_ = cmd.Wait() // Reap the process to avoid zombies
-		}
-		_ = os.Remove(sockPath)
-	}
+	return fmt.Sprintf("%s|%s|%s|%s|%s|%s", t.Name, t.Mode, t.Host, t.SSHUser, t.SSHKey, t.SSHJump)
 }
 
 func openBrowser(url string) {

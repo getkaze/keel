@@ -93,3 +93,45 @@ func TestMatchServiceToContainer_ExplicitHostname(t *testing.T) {
 		t.Errorf("expected myapp-mysql57, got %q", ci.Names)
 	}
 }
+
+func TestMergeContainers_Deduplicates(t *testing.T) {
+	a := []ContainerInfo{
+		{ID: "aaa", Names: "/keel-mysql"},
+		{ID: "bbb", Names: "/keel-redis"},
+	}
+	b := []ContainerInfo{
+		{ID: "bbb", Names: "/keel-redis"}, // duplicate
+		{ID: "ccc", Names: "/keel-mongo"},
+	}
+	merged := mergeContainers(a, b)
+	if len(merged) != 3 {
+		t.Fatalf("expected 3 unique containers, got %d", len(merged))
+	}
+	ids := map[string]bool{}
+	for _, c := range merged {
+		ids[c.ID] = true
+	}
+	for _, id := range []string{"aaa", "bbb", "ccc"} {
+		if !ids[id] {
+			t.Errorf("missing container %s in merged result", id)
+		}
+	}
+}
+
+func TestMergeContainers_EmptyLists(t *testing.T) {
+	merged := mergeContainers(nil, nil)
+	if len(merged) != 0 {
+		t.Errorf("expected 0 containers for empty lists, got %d", len(merged))
+	}
+}
+
+func TestMergeContainers_OneEmpty(t *testing.T) {
+	a := []ContainerInfo{{ID: "aaa", Names: "/keel-mysql"}}
+	merged := mergeContainers(a, nil)
+	if len(merged) != 1 {
+		t.Fatalf("expected 1 container, got %d", len(merged))
+	}
+	if merged[0].ID != "aaa" {
+		t.Errorf("expected id aaa, got %q", merged[0].ID)
+	}
+}

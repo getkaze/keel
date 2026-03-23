@@ -307,7 +307,11 @@ function terminalPanel() {
                 tab.connected = true;
                 self.tabs = self.tabs.slice();
                 self.sendResize(tab);
-                if (self.activeTabId === tabId && tab.term) {
+                // Clear screen client-side so the prompt renders clean
+                // at the top. Done here (not server-side) to avoid a race
+                // where ANSI escapes arrive before xterm.js is ready.
+                if (tab.term) {
+                    tab.term.clear();
                     tab.term.focus();
                 }
             };

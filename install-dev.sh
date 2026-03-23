@@ -4,18 +4,30 @@
 set -euo pipefail
 
 BINARY_NAME="keel"
-INSTALL_DIR="/usr/local/bin"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_PATH="${SCRIPT_DIR}/bin/${BINARY_NAME}"
 
-# Data directory: Linux uses /var/lib/keel, macOS uses ~/.keel
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-if [ "$OS" = "darwin" ]; then
-  REAL_USER="${SUDO_USER:-$(whoami)}"
-  REAL_HOME=$(eval echo "~${REAL_USER}")
-  KEEL_DIR="${REAL_HOME}/.keel"
+REAL_USER="${SUDO_USER:-$(whoami)}"
+REAL_HOME=$(eval echo "~${REAL_USER}")
+
+# Install to user-writable directory
+if [ "$(id -u)" = "0" ]; then
+  INSTALL_DIR="${REAL_HOME}/.local/bin"
+  mkdir -p "$INSTALL_DIR"
+  chown "$REAL_USER" "$INSTALL_DIR"
 else
+  INSTALL_DIR="${HOME}/.local/bin"
+  mkdir -p "$INSTALL_DIR"
+fi
+
+# Data directory
+if [ "$OS" = "darwin" ]; then
+  KEEL_DIR="${REAL_HOME}/.keel"
+elif [ "$(id -u)" = "0" ]; then
   KEEL_DIR="/var/lib/keel"
+else
+  KEEL_DIR="${HOME}/.keel"
 fi
 
 bold=$(tput bold 2>/dev/null || true)
@@ -27,7 +39,6 @@ info() { echo "${bold}==>${reset} $*"; }
 ok()   { echo "${green}  ✓${reset} $*"; }
 fail() { echo "${red}error:${reset} $*" >&2; exit 1; }
 
-[ "$(id -u)" = "0" ] || fail "run with sudo: sudo bash install-dev.sh"
 [ -f "$BIN_PATH" ] || fail "bin/keel not found — run 'make build' first"
 
 # ── install binary ─────────────────────────────────────────────────────────────
@@ -114,10 +125,10 @@ setup_ghcr() {
 setup_ghcr
 
 # ── ownership ─────────────────────────────────────────────────────────────────
-REAL_USER="${REAL_USER:-${SUDO_USER:-}}"
-if [ -n "$REAL_USER" ]; then
-  chown -R "${REAL_USER}" "${KEEL_DIR}"
-  ok "ownership of ${KEEL_DIR} set to ${REAL_USER}"
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+  chown -R "${SUDO_USER}" "${KEEL_DIR}"
+  chown "${SUDO_USER}" "${INSTALL_DIR}/${BINARY_NAME}"
+  ok "ownership set to ${SUDO_USER} (self-update enabled)"
 fi
 
 # ── done ──────────────────────────────────────────────────────────────────────

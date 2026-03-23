@@ -37,34 +37,38 @@
 
         <div class="topbar-sep"></div>
 
-        <a href="https://buymeacoffee.com/metzker" target="_blank" rel="noopener" class="topbar-btn bmac-btn" title="Buy me a coffee">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 8h1a4 4 0 110 8h-1"/>
-                <path d="M3 8h14v9a4 4 0 01-4 4H7a4 4 0 01-4-4V8z"/>
-                <line x1="6" y1="2" x2="6" y2="4"/>
-                <line x1="10" y1="2" x2="10" y2="4"/>
-                <line x1="14" y1="2" x2="14" y2="4"/>
-            </svg>
-            buy me a coffee
-        </a>
+        <div class="donate-dropdown" style="position:relative">
+            <button class="topbar-btn bmac-btn" onclick="this.parentElement.classList.toggle('open')" title="Support the project">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 8h1a4 4 0 110 8h-1"/>
+                    <path d="M3 8h14v9a4 4 0 01-4 4H7a4 4 0 01-4-4V8z"/>
+                    <line x1="6" y1="2" x2="6" y2="4"/>
+                    <line x1="10" y1="2" x2="10" y2="4"/>
+                    <line x1="14" y1="2" x2="14" y2="4"/>
+                </svg>
+                donate
+            </button>
+            <div class="donate-menu">
+                <a href="https://donate.stripe.com/7sY14p4Uz28QdYB66fd7q00" target="_blank" rel="noopener">Brasil (Stripe)</a>
+                <a href="https://buymeacoffee.com/metzker" target="_blank" rel="noopener">International (BMC)</a>
+            </div>
+        </div>
 
         <div class="topbar-right">
+            <div id="update-indicator" style="display:none">
+                <button class="update-pill" onclick="openUpdateModal()" title="New version available">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v14m0 0l-4-4m4 4l4-4"/><path d="M5 19h14"/></svg>
+                    <span id="update-version"></span>
+                </button>
+            </div>
             <div class="target-selector">
-                <span class="target-dot"></span>
+                <span class="target-dot" id="tunnel-dot"></span>
                 {{.TargetName}}
             </div>
             <div id="metrics-mini"
                  hx-get="/partials/metrics-mini"
                  hx-trigger="load, every 10s"
                  hx-swap="innerHTML"></div>
-
-            <div id="update-indicator" style="display:none">
-                <a href="#" onclick="showToast('Run: sudo keel update', 'info'); return false;"
-                   class="update-badge" title="New version available">
-                    <svg class="icon-sm"><use href="/static/lucide-sprite.svg#download"></use></svg>
-                    <span id="update-version"></span>
-                </a>
-            </div>
 
             <button class="topbar-btn" onclick="toggleTheme()" title="Toggle theme">
                 <svg id="theme-icon-sun" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -168,6 +172,34 @@
         </article>
     </dialog>
 
+    <!-- Update modal -->
+    <dialog id="update-modal">
+        <article class="update-modal-content">
+            <header class="update-modal-header">
+                <div>
+                    <h3>New version available</h3>
+                    <p class="text-sm text-muted" style="margin:0">
+                        <span id="update-modal-current"></span>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="vertical-align:middle;margin:0 4px"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                        <span id="update-modal-latest" class="text-accent"></span>
+                    </p>
+                </div>
+                <button class="btn-ghost btn sm" onclick="document.getElementById('update-modal').close()" id="update-modal-close-btn">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </header>
+            <div id="update-modal-changelog" class="update-modal-changelog"></div>
+            <div id="update-modal-progress" class="update-modal-progress" style="display:none"></div>
+            <footer class="update-modal-footer">
+                <button class="btn-ghost btn sm" onclick="document.getElementById('update-modal').close()" id="update-modal-cancel">Cancel</button>
+                <button class="btn btn-primary sm" id="update-modal-btn" onclick="performUpdate()">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-right:4px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Update now
+                </button>
+            </footer>
+        </article>
+    </dialog>
+
     <!-- Detail overlay + panel -->
     <div class="detail-overlay" id="detail-overlay" onclick="closeDetail()"></div>
     <div class="detail-panel" id="detail-panel"></div>
@@ -249,6 +281,25 @@
             document.documentElement.setAttribute('data-theme', saved);
             updateThemeIcons(saved);
         }
+    })();
+
+    // Tunnel status indicator (SSE)
+    (function() {
+        var dot = document.getElementById('tunnel-dot');
+        if (!dot) return;
+        var colors = {
+            connected:    'var(--green)',
+            reconnecting: 'var(--yellow, #e2b93d)',
+            failed:       'var(--red, #e25c5c)',
+            disconnected: 'var(--muted, #888)'
+        };
+        var es = new EventSource('/api/tunnel/status');
+        es.onmessage = function(e) {
+            var c = colors[e.data] || colors.connected;
+            dot.style.background = c;
+            dot.style.boxShadow = '0 0 6px ' + c;
+            dot.title = 'Tunnel: ' + e.data;
+        };
     })();
     </script>
     <script src="/static/alpine.min.js" defer></script>

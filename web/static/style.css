@@ -226,6 +226,38 @@ a:hover { opacity: 0.85; }
     opacity: 1;
 }
 
+.donate-dropdown .donate-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 160px;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+
+.donate-dropdown.open .donate-menu { display: block; }
+
+.donate-menu a {
+    display: block;
+    padding: 6px 12px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: .03em;
+}
+
+.donate-menu a:hover {
+    color: var(--text);
+    background: var(--surface2);
+}
+
 .topbar-right {
     margin-left: auto;
     display: flex;
@@ -1577,18 +1609,10 @@ article.card, .service-card {
 .seeder-status.pending { color: var(--muted2); }
 .seeder-status.running { color: var(--yellow); }
 
-/* Legacy seeder card compat */
-.seeder-card {
-    background: var(--surface);
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    transition: background .15s;
-}
-.seeder-card:hover { background: var(--surface2); }
-.seeder-card.seeder-idle    { border-left: 2px solid var(--muted2); }
-.seeder-card.seeder-running { border-left: 2px solid var(--yellow); }
-.seeder-card.seeder-success { border-left: 2px solid var(--green); }
-.seeder-card.seeder-error   { border-left: 2px solid var(--red); }
+.seeder-item.seeder-idle    { border-left: 2px solid var(--muted2); }
+.seeder-item.seeder-running { border-left: 2px solid var(--yellow); }
+.seeder-item.seeder-success { border-left: 2px solid var(--green); }
+.seeder-item.seeder-error   { border-left: 2px solid var(--red); }
 
 /* ══════════════════════════════════════════
    15. TARGETS VIEW
@@ -2133,27 +2157,33 @@ progress.bar-warning::-moz-progress-bar { background: var(--yellow); }
 progress.bar-error::-moz-progress-bar   { background: var(--red); }
 
 /* ══════════════════════════════════════════
-   23. UPDATE BADGE
+   23. UPDATE PILL
    ══════════════════════════════════════════ */
 
-.update-badge {
-    display: flex;
+.update-pill {
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 7px;
-    background: var(--yellow-bg);
-    border: 1px solid var(--yellow-bdr);
-    color: var(--yellow);
-    font-family: var(--sans);
-    font-size: 12px;
-    letter-spacing: .04em;
-    text-decoration: none;
+    gap: 5px;
+    padding: 3px 10px 3px 8px;
+    background: linear-gradient(135deg, var(--accent), #7c3aed);
+    border: none;
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .03em;
     cursor: pointer;
-    border-radius: 4px;
-    animation: pulse 2s ease-in-out infinite;
+    border-radius: 999px;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 0 8px rgba(139, 92, 246, .35);
 }
 
-.update-badge:hover { background: #241a00; }
+.update-pill:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 14px rgba(139, 92, 246, .5);
+}
+
+.update-pill svg { flex-shrink: 0; }
 
 /* ══════════════════════════════════════════
    24. DIALOG / MODAL
@@ -2193,6 +2223,131 @@ dialog footer {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+}
+
+/* Update modal */
+#update-modal {
+    max-width: 40rem;
+    width: 90%;
+    padding: 0;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+}
+
+.update-modal-content { margin: 0; }
+
+.update-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 24px 28px 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.update-modal-header h3 { font-size: 15px; margin-bottom: 4px; }
+
+.update-modal-changelog {
+    padding: 20px 28px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--muted2);
+}
+
+.update-modal-changelog .changelog-section { margin-bottom: 16px; }
+.update-modal-changelog .changelog-section:last-child { margin-bottom: 0; }
+
+.update-modal-changelog .changelog-heading {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted2);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.changelog-icon {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}
+
+.changelog-icon-added   { color: var(--green); }
+.changelog-icon-changed { color: var(--accent); }
+.changelog-icon-fixed   { color: var(--green); }
+.changelog-icon-removed { color: var(--red); }
+
+.update-modal-changelog .changelog-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.update-modal-changelog .changelog-list li {
+    position: relative;
+    padding-left: 16px;
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.update-modal-changelog .changelog-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 9px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--muted);
+}
+
+.update-modal-changelog .changelog-text { margin: 0 0 8px; }
+
+.update-modal-progress {
+    padding: 16px 24px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted2);
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.update-modal-footer {
+    margin-top: 0;
+    border-top: none;
+    padding: 18px 28px 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.spinner-sm {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 4px;
 }
 
 /* ══════════════════════════════════════════
@@ -2435,7 +2590,9 @@ dialog footer {
 .text-primary { color: var(--accent); }
 .text-success { color: var(--green); }
 .text-error   { color: var(--red); }
+.text-warning { color: var(--yellow); }
 .text-muted   { color: var(--muted); }
+.text-accent  { color: var(--accent); }
 .border-b { border-bottom: 1px solid var(--border); }
 .border-t { border-top: 1px solid var(--border); }
 .overflow-auto  { overflow-y: auto; }

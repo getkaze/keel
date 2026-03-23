@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/getkaze/keel/internal/config"
+	"github.com/getkaze/keel/internal/docker"
+	"github.com/getkaze/keel/internal/tunnel"
 )
 
 // Config holds server configuration.
@@ -23,6 +25,8 @@ type Config struct {
 	Version  string
 	Ctx      context.Context        // Application-wide context, cancelled on shutdown
 	Target   *config.TargetConfig   // Active target (nil = local)
+	Runner   docker.CmdRunner       // Docker command runner (local or remote)
+	Tunnel   *tunnel.Monitor        // SSH tunnel monitor (nil = local target)
 }
 
 // Server wraps the HTTP server with middleware and routing.
