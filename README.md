@@ -97,7 +97,7 @@ keel help
 |------|---------|-------------|
 | `-port` | `60000` | HTTP port |
 | `-bind` | `127.0.0.1` | Bind address |
-| `-keel-dir` | `/var/lib/keel` | Data directory |
+| `-keel-dir` | `/var/lib/keel` (Linux) or `~/.keel` (macOS) | Data directory |
 | `-dev` | `false` | Serve web assets from filesystem |
 
 Override the data directory with `KEEL_DIR` environment variable.

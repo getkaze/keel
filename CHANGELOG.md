@@ -9,6 +9,21 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4] — 2026-03-27
+
+### Changed
+
+- Command field in service definitions is now split into args instead of wrapped with `sh -c`, fixing containers with custom entrypoints like cloudflared (@mateusmetzker)
+- Install script always uses `~/.local/bin` to enable self-update without sudo (@mateusmetzker)
+
+### Fixed
+
+- Containers with ENTRYPOINT (e.g. cloudflared) no longer fail when command contains spaces — previously `sh -c` wrapper conflicted with the entrypoint (@mateusmetzker)
+
+### Docs
+
+- README documents keel-dir defaults per OS (Linux vs macOS) (@mateusmetzker)
+
 ## [0.3] — 2026-03-23
 
 ### Added
@@ -153,7 +168,8 @@ Initial public release (@mateusmetzker).
 - Data directory: `/var/lib/keel` (Linux) or `~/.keel` (macOS)
 - Install script: `curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash`
 
-[Unreleased]: https://github.com/getkaze/keel/compare/v0.3...HEAD
+[Unreleased]: https://github.com/getkaze/keel/compare/v0.4...HEAD
+[0.4]: https://github.com/getkaze/keel/compare/v0.3...v0.4
 [0.3]: https://github.com/getkaze/keel/compare/v0.2...v0.3
 [0.2]: https://github.com/getkaze/keel/compare/v0.1.1...v0.2
 [0.1.1]: https://github.com/getkaze/keel/compare/v0.1.0...v0.1.1

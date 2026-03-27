@@ -6,7 +6,7 @@ set -euo pipefail
 BINARY_NAME="keel"
 RELEASES_BASE="https://github.com/getkaze/keel/releases"
 
-# Install directory: user-writable ~/.local/bin preferred, /usr/local/bin as fallback.
+# Install directory: always ~/.local/bin (user-writable, enables self-update without sudo).
 REAL_USER="${SUDO_USER:-$(whoami)}"
 REAL_HOME=$(eval echo "~${REAL_USER}")
 if [ "$(id -u)" = "0" ]; then
