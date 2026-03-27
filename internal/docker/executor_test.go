@@ -258,10 +258,10 @@ func TestBoot_CommandWithSpaces(t *testing.T) {
 	_ = e.boot(context.Background(), out, svc)
 
 	args := mr.lastArgs()
-	// Should end with: "sh", "-c", "npm run dev"
+	// Should end with: "npm", "run", "dev" (split by fields)
 	n := len(args)
-	if n < 3 || args[n-3] != "sh" || args[n-2] != "-c" || args[n-1] != "npm run dev" {
-		t.Errorf("expected sh -c 'npm run dev' at end of args: %v", args)
+	if n < 3 || args[n-3] != "npm" || args[n-2] != "run" || args[n-1] != "dev" {
+		t.Errorf("expected 'npm run dev' split as args at end: %v", args)
 	}
 }
 

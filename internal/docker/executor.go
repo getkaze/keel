@@ -231,11 +231,7 @@ func (e *Executor) boot(ctx context.Context, out chan<- string, svc model.Servic
 
 	args = append(args, svc.Image)
 	if svc.Command != "" {
-		if strings.ContainsAny(svc.Command, " \t\"'") {
-			args = append(args, "sh", "-c", svc.Command)
-		} else {
-			args = append(args, svc.Command)
-		}
+		args = append(args, strings.Fields(svc.Command)...)
 	}
 
 	return e.dockerStream(ctx, out, args...)
