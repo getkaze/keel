@@ -273,6 +273,15 @@ func runReset(args []string, keelDir string) {
 		// Clear seeder state for seeders targeting this service
 		docker.ClearSeederStateForService(keelDir, svc.Name)
 
+		if svc.Registry == "local" {
+			fmt.Printf("[%s] local image, skipping pull\n", svc.Name)
+		} else {
+			fmt.Printf("[%s] pulling %s\n", svc.Name, svc.Image)
+			if err := runner.Exec(ctx, "pull", svc.Image); err != nil {
+				fmt.Fprintf(os.Stderr, "[%s] pull failed: %v\n", svc.Name, err)
+			}
+		}
+
 		fmt.Printf("[%s] booting\n", svc.Name)
 		if err := runner.Boot(ctx, svc, keelDir); err != nil {
 			fmt.Fprintf(os.Stderr, "[%s] boot error: %v\n", svc.Name, err)
