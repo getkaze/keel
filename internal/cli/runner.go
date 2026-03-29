@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -452,13 +453,32 @@ func buildRunArgs(svc model.Service, keelDir, portBind string) []string {
 		}
 	}
 
+	if svc.HealthCheck != nil {
+		hc := svc.HealthCheck
+		var healthCmd string
+		switch hc.Type {
+		case "http":
+			healthCmd = "wget -qO- " + hc.URL + " >/dev/null 2>&1 || curl -sf " + hc.URL + " >/dev/null 2>&1"
+		case "command":
+			healthCmd = hc.Command
+		}
+		if healthCmd != "" {
+			args = append(args, "--health-cmd", healthCmd)
+		}
+		if hc.Interval > 0 {
+			args = append(args, "--health-interval", strconv.Itoa(hc.Interval)+"s")
+		}
+		if hc.Retries > 0 {
+			args = append(args, "--health-retries", strconv.Itoa(hc.Retries))
+		}
+		if hc.StartPeriod > 0 {
+			args = append(args, "--health-start-period", strconv.Itoa(hc.StartPeriod)+"s")
+		}
+	}
+
 	args = append(args, svc.Image)
 	if svc.Command != "" {
-		if strings.ContainsAny(svc.Command, " \t\"'") {
-			args = append(args, "sh", "-c", svc.Command)
-		} else {
-			args = append(args, svc.Command)
-		}
+		args = append(args, strings.Fields(svc.Command)...)
 	}
 	return args
 }

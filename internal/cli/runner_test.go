@@ -71,8 +71,14 @@ func TestBuildRunArgs_CommandWithSpaces(t *testing.T) {
 	}
 	args := buildRunArgs(svc, "/opt/keel", "")
 	n := len(args)
-	if n < 3 || args[n-3] != "sh" || args[n-2] != "-c" || args[n-1] != "npm run start" {
-		t.Errorf("expected 'sh -c npm run start' at end, got: %v", args[n-3:])
+	// Command is split into fields — no sh -c wrapper
+	if n < 3 || args[n-3] != "npm" || args[n-2] != "run" || args[n-1] != "start" {
+		t.Errorf("expected 'npm run start' split as args at end, got: %v", args[n-3:])
+	}
+	for _, a := range args {
+		if a == "sh" {
+			t.Error("command with spaces must not use sh -c wrapper")
+		}
 	}
 }
 
