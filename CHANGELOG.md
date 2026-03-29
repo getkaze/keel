@@ -16,6 +16,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Health checks are now applied to containers at boot — `--health-cmd`, `--health-interval`, `--health-retries`, and `--health-start-period` flags were missing from `docker run` despite being defined in service config (@mateusmetzker)
+- HTTP health check now uses `wget` with `curl` as fallback instead of requiring `curl` — covers Alpine-based images (wget) and Debian/Ubuntu (curl) without changes to the image (@mateusmetzker)
+- CLI runner (`keel reset`, `keel start`) now splits `command` into args instead of wrapping with `sh -c` — fixes crash on minimal images (scratch, distroless) that have no `/bin/sh` (@mateusmetzker)
+- CLI runner now applies health check flags at boot, matching the dashboard executor behavior (@mateusmetzker)
 
 ## [0.4] — 2026-03-27
 
