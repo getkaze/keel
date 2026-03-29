@@ -9,6 +9,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `registry: "local"` — skip `docker pull` for locally built images; allows using images like `myapp:local` without a remote registry (@mateusmetzker)
+
+### Fixed
+
+- Health checks are now applied to containers at boot — `--health-cmd`, `--health-interval`, `--health-retries`, and `--health-start-period` flags were missing from `docker run` despite being defined in service config (@mateusmetzker)
+
 ## [0.4] — 2026-03-27
 
 ### Changed

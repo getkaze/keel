@@ -314,6 +314,146 @@ func TestResolveVolume_RelativePath(t *testing.T) {
 	}
 }
 
+// --- Health check tests ---
+
+func TestBoot_HealthCheckHTTP(t *testing.T) {
+	svc := model.Service{
+		Name:     "app",
+		Hostname: "keel-app",
+		Image:    "myapp:latest",
+		HealthCheck: &model.HealthCheck{
+			Type:        "http",
+			URL:         "http://127.0.0.1:8080/health",
+			Interval:    15,
+			Retries:     3,
+			StartPeriod: 10,
+		},
+	}
+	mr := &mockRunner{}
+	e := &Executor{Runner: mr, KeelDir: "/tmp/keel"}
+	out := make(chan string, 64)
+	_ = e.boot(context.Background(), out, svc)
+
+	args := mr.lastArgs()
+	checks := map[string]string{
+		"--health-cmd":          "curl -sf http://127.0.0.1:8080/health || exit 1",
+		"--health-interval":     "15s",
+		"--health-retries":      "3",
+		"--health-start-period": "10s",
+	}
+	for flag, want := range checks {
+		found := false
+		for i, a := range args {
+			if a == flag && i+1 < len(args) && args[i+1] == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected %s %s in args: %v", flag, want, args)
+		}
+	}
+}
+
+func TestBoot_HealthCheckCommand(t *testing.T) {
+	svc := model.Service{
+		Name:     "app",
+		Hostname: "keel-app",
+		Image:    "myapp:latest",
+		HealthCheck: &model.HealthCheck{
+			Type:    "command",
+			Command: "pg_isready -U postgres",
+			Retries: 5,
+		},
+	}
+	mr := &mockRunner{}
+	e := &Executor{Runner: mr, KeelDir: "/tmp/keel"}
+	out := make(chan string, 64)
+	_ = e.boot(context.Background(), out, svc)
+
+	args := mr.lastArgs()
+	found := false
+	for i, a := range args {
+		if a == "--health-cmd" && i+1 < len(args) && args[i+1] == "pg_isready -U postgres" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected --health-cmd with command string in args: %v", args)
+	}
+}
+
+func TestBoot_NoHealthCheck(t *testing.T) {
+	svc := model.Service{
+		Name:     "redis",
+		Hostname: "keel-redis",
+		Image:    "redis:7",
+	}
+	mr := &mockRunner{}
+	e := &Executor{Runner: mr, KeelDir: "/tmp/keel"}
+	out := make(chan string, 64)
+	_ = e.boot(context.Background(), out, svc)
+
+	for _, a := range mr.lastArgs() {
+		if strings.HasPrefix(a, "--health-") {
+			t.Errorf("unexpected health flag %q when HealthCheck is nil", a)
+		}
+	}
+}
+
+// --- Local registry tests ---
+
+func TestUpdate_LocalRegistrySkipsPull(t *testing.T) {
+	dir := t.TempDir()
+	store := config.NewServiceStore(dir)
+	_ = store.Save(model.Service{
+		Name:     "mole",
+		Hostname: "mole",
+		Image:    "mole:local",
+		Registry: "local",
+		Network:  "keel-net",
+	})
+
+	mr := &mockRunner{}
+	e := NewExecutor(dir, store, mr)
+	out := make(chan string, 64)
+	_ = e.updateService(context.Background(), out, "mole")
+
+	for _, cmd := range mr.cmds {
+		if len(cmd) > 0 && cmd[0] == "pull" {
+			t.Errorf("pull should be skipped for local registry, got cmd: %v", cmd)
+		}
+	}
+}
+
+func TestUpdate_RemoteRegistryPulls(t *testing.T) {
+	dir := t.TempDir()
+	store := config.NewServiceStore(dir)
+	_ = store.Save(model.Service{
+		Name:     "nginx",
+		Hostname: "keel-nginx",
+		Image:    "nginx:latest",
+		Network:  "keel-net",
+	})
+
+	mr := &mockRunner{}
+	e := NewExecutor(dir, store, mr)
+	out := make(chan string, 64)
+	_ = e.updateService(context.Background(), out, "nginx")
+
+	pulled := false
+	for _, cmd := range mr.cmds {
+		if len(cmd) > 0 && cmd[0] == "pull" {
+			pulled = true
+			break
+		}
+	}
+	if !pulled {
+		t.Error("expected pull to be called for remote registry")
+	}
+}
+
 // --- emit test ---
 
 func TestEmit_FullChannel(t *testing.T) {

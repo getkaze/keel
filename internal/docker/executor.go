@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -156,10 +157,14 @@ func (e *Executor) updateService(ctx context.Context, out chan<- string, name st
 		}
 	}
 
-	emit(out, fmt.Sprintf("[%s] pulling %s", svc.Name, svc.Image))
-	if err := e.dockerStream(ctx, out, "pull", svc.Image); err != nil {
-		emit(out, fmt.Sprintf("[%s] pull failed, keeping existing container: %v", svc.Name, err))
-		return fmt.Errorf("pull %s: %w", svc.Image, err)
+	if svc.Registry == "local" {
+		emit(out, fmt.Sprintf("[%s] local image, skipping pull", svc.Name))
+	} else {
+		emit(out, fmt.Sprintf("[%s] pulling %s", svc.Name, svc.Image))
+		if err := e.dockerStream(ctx, out, "pull", svc.Image); err != nil {
+			emit(out, fmt.Sprintf("[%s] pull failed, keeping existing container: %v", svc.Name, err))
+			return fmt.Errorf("pull %s: %w", svc.Image, err)
+		}
 	}
 
 	emit(out, fmt.Sprintf("[%s] removing container", svc.Name))
@@ -226,6 +231,29 @@ func (e *Executor) boot(ctx context.Context, out chan<- string, svc model.Servic
 		if len(parts) == 2 {
 			src := filepath.Join(e.KeelDir, parts[0])
 			args = append(args, "-v", src+":"+parts[1]+":ro")
+		}
+	}
+
+	if svc.HealthCheck != nil {
+		hc := svc.HealthCheck
+		var healthCmd string
+		switch hc.Type {
+		case "http":
+			healthCmd = "curl -sf " + hc.URL + " || exit 1"
+		case "command":
+			healthCmd = hc.Command
+		}
+		if healthCmd != "" {
+			args = append(args, "--health-cmd", healthCmd)
+		}
+		if hc.Interval > 0 {
+			args = append(args, "--health-interval", strconv.Itoa(hc.Interval)+"s")
+		}
+		if hc.Retries > 0 {
+			args = append(args, "--health-retries", strconv.Itoa(hc.Retries))
+		}
+		if hc.StartPeriod > 0 {
+			args = append(args, "--health-start-period", strconv.Itoa(hc.StartPeriod)+"s")
 		}
 	}
 

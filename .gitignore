@@ -9,3 +9,10 @@ chati.dev/
 .vscode/
 .claude/
 .chati/
+
+# HELM
+.helm/
+agents/
+rules/
+schemas/
+helm.yaml

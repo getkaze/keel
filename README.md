@@ -309,7 +309,7 @@ Each service is a JSON file in `data/services/`. Full example:
 | `group` | Logical grouping — `infra` starts first, then seeders, then the rest |
 | `hostname` | Docker container hostname |
 | `image` | Docker image `name:tag` |
-| `registry` | Set to `ghcr` to auto-login with stored credentials (omit for public images) |
+| `registry` | `ghcr` — auto-login with stored credentials; `local` — skip pull for locally built images (omit for public images) |
 | `network` | Docker network (defaults to `keel-net`) |
 | `ports` | `{ internal, external }` port mapping |
 | `environment` | Environment variables passed to the container |
