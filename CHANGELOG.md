@@ -15,6 +15,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Dashboard: page header action buttons no longer overflow off-screen on narrow viewports (@mateusmetzker)
+- Dashboard: sidebar is now accessible on mobile via a hamburger menu instead of being hidden with no way to reopen (@mateusmetzker)
 - `keel reset` now pulls the latest image before recreating the container, matching the dashboard behavior — previously it reused the local cache, so updates were silently ignored (@mateusmetzker)
 - Health checks are now applied to containers at boot — `--health-cmd`, `--health-interval`, `--health-retries`, and `--health-start-period` flags were missing from `docker run` despite being defined in service config (@mateusmetzker)
 - HTTP health check now uses `wget` with `curl` as fallback instead of requiring `curl` — covers Alpine-based images (wget) and Debian/Ubuntu (curl) without changes to the image (@mateusmetzker)

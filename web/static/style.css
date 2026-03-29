@@ -423,6 +423,7 @@ a:hover { opacity: 0.85; }
     align-items: center;
     gap: 12px;
     flex-shrink: 0;
+    flex-wrap: wrap;
 }
 
 .page-title {
@@ -2633,9 +2634,51 @@ dialog footer {
    33. RESPONSIVE
    ══════════════════════════════════════════ */
 
+/* Hamburger menu — hidden on desktop */
+.sidebar-hamburger { display: none; }
+.sidebar-overlay { display: none; }
+
 @media (max-width: 768px) {
-    /* Layout */
-    .sidebar { display: none; }
+    /* Hamburger toggle */
+    .sidebar-hamburger {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
+    }
+    .sidebar-hamburger:hover { color: var(--text); }
+
+    /* Sidebar: off-screen by default, shown when .open */
+    .sidebar {
+        display: flex;
+        position: fixed;
+        top: var(--topbar-h);
+        left: 0;
+        bottom: 0;
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+    }
+    .sidebar.open { transform: translateX(0); }
+
+    /* Overlay behind sidebar */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        top: var(--topbar-h);
+        background: rgba(0,0,0,.4);
+        z-index: 99;
+    }
+    .sidebar-overlay.open { display: block; }
+
     .topbar { padding: 0 12px; gap: 8px; }
     .topbar-metrics { display: none; }
     .topbar-wordmark { display: none; }
