@@ -239,7 +239,7 @@ func (e *Executor) boot(ctx context.Context, out chan<- string, svc model.Servic
 		var healthCmd string
 		switch hc.Type {
 		case "http":
-			healthCmd = "curl -sf " + hc.URL + " || exit 1"
+			healthCmd = "wget -qO- " + hc.URL + " >/dev/null 2>&1 || curl -sf " + hc.URL + " >/dev/null 2>&1"
 		case "command":
 			healthCmd = hc.Command
 		}

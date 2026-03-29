@@ -336,7 +336,7 @@ func TestBoot_HealthCheckHTTP(t *testing.T) {
 
 	args := mr.lastArgs()
 	checks := map[string]string{
-		"--health-cmd":          "curl -sf http://127.0.0.1:8080/health || exit 1",
+		"--health-cmd":          "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || curl -sf http://127.0.0.1:8080/health >/dev/null 2>&1",
 		"--health-interval":     "15s",
 		"--health-retries":      "3",
 		"--health-start-period": "10s",
