@@ -9,9 +9,16 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Kaze design system** — replace dark-first Recursive theme with light-only Inter-based design system; new color tokens, layered shadows, rounded cards with hover lift, and Kaze-aligned palette (@mateusmetzker)
+- **Remove dark theme** — single light theme only; theme toggle button and JS removed (@mateusmetzker)
+
 ### Added
 
 - `registry: "local"` — skip `docker pull` for locally built images; allows using images like `myapp:local` without a remote registry (@mateusmetzker)
+- **Local registry in UI** — "New container" form now includes a "Local (pre-built image)" option in the registry dropdown (@mateusmetzker)
+- **Docs icon in update modal** — changelog sections titled "Docs" now render with a document icon instead of being blank (@mateusmetzker)
 
 ### Fixed
 

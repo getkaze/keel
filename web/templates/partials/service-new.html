@@ -40,8 +40,9 @@
                     <select name="registry" class="field-input">
                         <option value="">Docker Hub (default)</option>
                         <option value="ghcr">GHCR (ghcr.io)</option>
+                        <option value="local">Local (pre-built image)</option>
                     </select>
-                    <div class="field-hint">GHCR requires credentials in state/ghcr-user + ghcr-pat</div>
+                    <div class="field-hint">Local skips pull — image must already exist on the host</div>
                 </div>
                 <div>
                     <label class="field-label">group</label>
