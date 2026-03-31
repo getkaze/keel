@@ -7,14 +7,14 @@
     <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#0a0a0a">
+    <meta name="theme-color" content="#fbfbf8">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Keel">
     <meta name="description" content="Docker container management dashboard">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Recursive:slnt,wght,CASL,MONO@-15..0,300..700,0..1,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Recursive:slnt,wght,CASL,MONO@-15..0,300..700,0..1,0..1&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/xterm.css">
 </head>
@@ -76,11 +76,6 @@
                  hx-get="/partials/metrics-mini"
                  hx-trigger="load, every 10s"
                  hx-swap="innerHTML"></div>
-
-            <button class="topbar-btn" onclick="toggleTheme()" title="Toggle theme">
-                <svg id="theme-icon-sun" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                <svg id="theme-icon-moon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-            </button>
 
             <button class="topbar-btn"
                     @click="terminalOpen = !terminalOpen"
@@ -276,36 +271,6 @@
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeDetail();
     });
-
-    // Theme toggle
-    function toggleTheme() {
-        var current = document.documentElement.getAttribute('data-theme');
-        var next = current === 'light' ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('keel-theme', next);
-        updateThemeIcons(next);
-    }
-
-    function updateThemeIcons(theme) {
-        var sun = document.getElementById('theme-icon-sun');
-        var moon = document.getElementById('theme-icon-moon');
-        if (theme === 'light') {
-            sun.style.display = 'block';
-            moon.style.display = 'none';
-        } else {
-            sun.style.display = 'none';
-            moon.style.display = 'block';
-        }
-    }
-
-    // Apply saved theme on load
-    (function() {
-        var saved = localStorage.getItem('keel-theme');
-        if (saved) {
-            document.documentElement.setAttribute('data-theme', saved);
-            updateThemeIcons(saved);
-        }
-    })();
 
     // Tunnel status indicator (SSE)
     (function() {
