@@ -1,8 +1,12 @@
 <div align="center">
 
-  <img src="logo.svg" alt="keel" width="48" height="48"/>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo-light.svg">
+    <source media="(prefers-color-scheme: light)" srcset="logo-dark.svg">
+    <img src="logo-dark.svg" alt="Keel" width="48" height="48">
+  </picture>
 
-  # keel
+  # Keel
 
   **One binary. Zero dependencies. Full Docker control.**
 

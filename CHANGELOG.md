@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Branding** — replace old wind/purple icon with Keel cross logo; favicon adapts to light/dark system theme; tab title and navbar wordmark capitalized to "Keel" (@mateusmetzker)
 - **Kaze design system** — replace dark-first Recursive theme with light-only Inter-based design system; new color tokens, layered shadows, rounded cards with hover lift, and Kaze-aligned palette (@mateusmetzker)
 - **Remove dark theme** — single light theme only; theme toggle button and JS removed (@mateusmetzker)
 
