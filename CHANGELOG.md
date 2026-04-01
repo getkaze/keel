@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Metrics** — metrics page now correctly shows remote host data when target is not local; previously always displayed local machine metrics after hot-reload (@mateusmetzker)
+
 ## [0.5] — 2026-04-01
 
 ### Changed

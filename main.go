@@ -18,6 +18,8 @@ import (
 	"github.com/getkaze/keel/internal/cli"
 	"github.com/getkaze/keel/internal/config"
 	"github.com/getkaze/keel/internal/docker"
+	"github.com/getkaze/keel/internal/handler"
+	"github.com/getkaze/keel/internal/metrics"
 	"github.com/getkaze/keel/internal/server"
 	"github.com/getkaze/keel/internal/tunnel"
 )
@@ -85,6 +87,11 @@ func main() {
 	}
 	runner := docker.NewReloadableRunner(inner)
 
+	remoteRef := &handler.RemoteRef{}
+	if target != nil && target.Mode == "remote" {
+		remoteRef.Store(metrics.NewRemoteCollector(target))
+	}
+
 	srv := server.New(server.Config{
 		Port:      port,
 		Bind:      bind,
@@ -96,10 +103,11 @@ func main() {
 		Target:    target,
 		Runner:    runner,
 		Tunnel:    tunnelMon,
+		RemoteRef: remoteRef,
 	})
 
 	// Watch target config for changes and hot-reload the runner.
-	go watchTargetConfig(ctx, keelDir, target, runner, &tunnelMon)
+	go watchTargetConfig(ctx, keelDir, target, runner, &tunnelMon, remoteRef)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	sigCh := make(chan os.Signal, 1)
@@ -132,7 +140,7 @@ func main() {
 
 // watchTargetConfig polls the target config files every 5 seconds and swaps
 // the Runner when the active target changes.
-func watchTargetConfig(ctx context.Context, keelDir string, current *config.TargetConfig, runner *docker.ReloadableRunner, tunnelMon **tunnel.Monitor) {
+func watchTargetConfig(ctx context.Context, keelDir string, current *config.TargetConfig, runner *docker.ReloadableRunner, tunnelMon **tunnel.Monitor, remoteRef *handler.RemoteRef) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -154,8 +162,10 @@ func watchTargetConfig(ctx context.Context, keelDir string, current *config.Targ
 			// Swap Runner.
 			if newTarget.Mode == "remote" {
 				runner.Swap(cli.NewRunner(newTarget, keelDir))
+				remoteRef.Store(metrics.NewRemoteCollector(newTarget))
 			} else {
 				runner.Swap(docker.NewLocalRunner())
+				remoteRef.Store(nil)
 			}
 
 			// Handle tunnel lifecycle.

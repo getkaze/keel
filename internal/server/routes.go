@@ -150,10 +150,7 @@ func registerRoutes(mux *http.ServeMux, cfg Config) {
 	// API: target, health, metrics, version
 	mux.Handle("GET /api/target", &handler.TargetHandler{KeelDir: cfg.KeelDir})
 	mux.Handle("GET /api/health", &handler.HealthHandler{Services: services, Docker: poller})
-	metricsHandler := &handler.MetricsHandler{Stats: statsPoller}
-	if cfg.Target != nil && cfg.Target.Mode == "remote" {
-		metricsHandler.Remote = metrics.NewRemoteCollector(cfg.Target)
-	}
+	metricsHandler := &handler.MetricsHandler{Stats: statsPoller, Remote: cfg.RemoteRef}
 	mux.Handle("GET /api/metrics", metricsHandler)
 	mux.Handle("GET /api/version", &handler.VersionHandler{Version: cfg.Version})
 	mux.Handle("POST /api/update", &handler.UpdateHandler{Version: cfg.Version})
@@ -166,7 +163,7 @@ func registerRoutes(mux *http.ServeMux, cfg Config) {
 		Stats:          statsPoller,
 		Tmpl:           tmpl,
 		Version:        cfg.Version,
-		Remote:         metricsHandler.Remote,
+		Remote:         cfg.RemoteRef,
 		SeederExecutor: seederExec,
 	})
 }

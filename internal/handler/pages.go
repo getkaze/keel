@@ -22,7 +22,7 @@ type PageDeps struct {
 	Stats          *metrics.StatsPoller
 	Tmpl           *template.Template
 	Version        string
-	Remote         *metrics.RemoteCollector // nil for local targets
+	Remote         *RemoteRef // shared atomic reference; value is nil for local targets
 	SeederExecutor *docker.SeederExecutor
 }
 
@@ -196,12 +196,12 @@ func (d *PageDeps) metricsPartial(w http.ResponseWriter, r *http.Request) {
 		wg         sync.WaitGroup
 	)
 
-	if d.Remote != nil {
+	if remote := d.Remote.Load(); remote != nil {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
 			var err error
-			cpu, mem, disk, loadAvg, uptime, err = d.Remote.ReadAll()
+			cpu, mem, disk, loadAvg, uptime, err = remote.ReadAll()
 			if err != nil {
 				log.Printf("remote metrics error: %v", err)
 			}
@@ -255,8 +255,8 @@ func (d *PageDeps) metricsMiniPartial(w http.ResponseWriter, r *http.Request) {
 		disk model.DiskMetrics
 	)
 
-	if d.Remote != nil {
-		cpu, mem, disk, _, _, _ = d.Remote.ReadAll()
+	if remote := d.Remote.Load(); remote != nil {
+		cpu, mem, disk, _, _, _ = remote.ReadAll()
 	} else {
 		cpu, _ = metrics.ReadCPU()
 		mem, _ = metrics.ReadMemory()

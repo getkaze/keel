@@ -5,14 +5,19 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/getkaze/keel/internal/metrics"
 	"github.com/getkaze/keel/internal/model"
 )
 
+// RemoteRef is a shared atomic reference to a RemoteCollector.
+// It allows hot-reloading when the active target changes.
+type RemoteRef = atomic.Pointer[metrics.RemoteCollector]
+
 // MetricsHandler handles GET /api/metrics.
 type MetricsHandler struct {
-	Remote *metrics.RemoteCollector // nil for local targets
+	Remote *RemoteRef // shared atomic reference; value is nil for local targets
 	Stats  *metrics.StatsPoller
 }
 
@@ -27,12 +32,12 @@ func (h *MetricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		wg         sync.WaitGroup
 	)
 
-	if h.Remote != nil {
+	if remote := h.Remote.Load(); remote != nil {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
 			var err error
-			cpu, mem, disk, loadAvg, uptime, err = h.Remote.ReadAll()
+			cpu, mem, disk, loadAvg, uptime, err = remote.ReadAll()
 			if err != nil {
 				log.Printf("remote metrics error: %v", err)
 			}

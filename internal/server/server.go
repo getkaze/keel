@@ -12,6 +12,7 @@ import (
 
 	"github.com/getkaze/keel/internal/config"
 	"github.com/getkaze/keel/internal/docker"
+	"github.com/getkaze/keel/internal/handler"
 	"github.com/getkaze/keel/internal/tunnel"
 )
 
@@ -24,9 +25,10 @@ type Config struct {
 	StaticFS fs.FS
 	Version  string
 	Ctx      context.Context        // Application-wide context, cancelled on shutdown
-	Target   *config.TargetConfig   // Active target (nil = local)
-	Runner   docker.CmdRunner       // Docker command runner (local or remote)
-	Tunnel   *tunnel.Monitor        // SSH tunnel monitor (nil = local target)
+	Target    *config.TargetConfig   // Active target (nil = local)
+	Runner    docker.CmdRunner       // Docker command runner (local or remote)
+	Tunnel    *tunnel.Monitor        // SSH tunnel monitor (nil = local target)
+	RemoteRef *handler.RemoteRef     // Shared atomic reference to RemoteCollector
 }
 
 // Server wraps the HTTP server with middleware and routing.
