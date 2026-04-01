@@ -20,6 +20,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `registry: "local"` — skip `docker pull` for locally built images; allows using images like `myapp:local` without a remote registry (@mateusmetzker)
 - **Local registry in UI** — "New container" form now includes a "Local (pre-built image)" option in the registry dropdown (@mateusmetzker)
 - **Docs icon in update modal** — changelog sections titled "Docs" now render with a document icon instead of being blank (@mateusmetzker)
+- **Operation banner** — persistent progress indicator during container operations (start, stop, restart, update); shows spinner + service name + action label, stays visible until completion, then resolves to success/error state with auto-dismiss; replaces the old auto-dismissing toast that left users blind during long operations (@mateusmetzker)
 
 ### Fixed
 

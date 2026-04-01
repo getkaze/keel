@@ -496,24 +496,82 @@ function navigateToLogs(serviceName) {
 
 // HTMX event hooks — game-style feedback
 var actionMessages = {
-    start:   { pending: '.. STARTING...',      ok: '>> CONTAINER STARTED!',    fail: '!! START FAILED' },
-    stop:    { pending: '.. STOPPING...',       ok: '>> CONTAINER STOPPED.',     fail: '!! STOP FAILED' },
-    restart: { pending: '.. RESTARTING...',     ok: '>> CONTAINER RESTARTED!',   fail: '!! RESTART FAILED' },
-    update:  { pending: '.. UPDATING...',       ok: '>> UPDATE COMPLETE!',       fail: '!! UPDATE FAILED' }
+    start:       { label: 'Start service',         ok: '>> CONTAINER STARTED!',    fail: '!! START FAILED' },
+    stop:        { label: 'Stop service',           ok: '>> CONTAINER STOPPED.',     fail: '!! STOP FAILED' },
+    restart:     { label: 'Restart service',        ok: '>> CONTAINER RESTARTED!',   fail: '!! RESTART FAILED' },
+    update:      { label: 'Update service',         ok: '>> UPDATE COMPLETE!',       fail: '!! UPDATE FAILED' },
+    'start-all': { label: 'Start all services',     ok: '>> ALL STARTED!',           fail: '!! START ALL FAILED' },
+    'stop-all':  { label: 'Stop all services',      ok: '>> ALL STOPPED.',           fail: '!! STOP ALL FAILED' }
 };
 
 function matchAction(el) {
     if (!el || !el.getAttribute) return null;
     var url = el.getAttribute('hx-post') || el.getAttribute('hx-delete') || '';
-    var match = url.match(/\/api\/services\/[^/]+\/(start|stop|restart|update)/);
-    return match ? match[1] : null;
+    var m = url.match(/\/api\/services\/(start-all|stop-all)/) || url.match(/\/api\/services\/[^/]+\/(start|stop|restart|update)/);
+    return m ? m[1] : null;
+}
+
+function matchServiceName(el) {
+    if (!el || !el.getAttribute) return null;
+    var url = el.getAttribute('hx-post') || el.getAttribute('hx-delete') || '';
+    var m = url.match(/\/api\/services\/([^/]+)\/(start|stop|restart|update)/);
+    return m ? m[1] : null;
+}
+
+// --- Operation banner ---
+
+var _opBannerTimer = null;
+
+function showOpBanner(serviceName, actionLabel) {
+    var banner = document.getElementById('op-banner');
+    if (!banner) return;
+    clearTimeout(_opBannerTimer);
+    banner.className = 'op-banner';
+    banner.style.display = '';
+    banner.innerHTML =
+        '<span class="op-banner-spinner"></span>' +
+        '<div class="op-banner-body">' +
+            '<div class="op-banner-title">' + escapeHtml(serviceName) + '</div>' +
+            '<div class="op-banner-desc">' + escapeHtml(actionLabel) + '</div>' +
+        '</div>' +
+        '<button class="op-banner-logs" onclick="document.dispatchEvent(new Event(\'operation-start\'))">View Logs</button>';
+}
+
+function resolveOpBanner(ok, message) {
+    var banner = document.getElementById('op-banner');
+    if (!banner || banner.style.display === 'none') return;
+    clearTimeout(_opBannerTimer);
+
+    var iconSvg = ok
+        ? '<svg class="op-banner-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+        : '<svg class="op-banner-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+
+    banner.className = 'op-banner ' + (ok ? 'is-success' : 'is-error');
+    // Keep title, update icon and description
+    var titleEl = banner.querySelector('.op-banner-title');
+    var title = titleEl ? titleEl.textContent : '';
+    banner.innerHTML =
+        iconSvg +
+        '<div class="op-banner-body">' +
+            '<div class="op-banner-title">' + escapeHtml(title) + '</div>' +
+            '<div class="op-banner-desc">' + escapeHtml(message) + '</div>' +
+        '</div>';
+
+    _opBannerTimer = setTimeout(function() {
+        banner.classList.add('op-banner-fade-out');
+        setTimeout(function() {
+            banner.style.display = 'none';
+            banner.className = 'op-banner';
+        }, 300);
+    }, 5000);
 }
 
 // Immediate feedback when button is clicked
 document.addEventListener('htmx:beforeRequest', function(e) {
     var action = matchAction(e.detail.elt);
     if (!action || !actionMessages[action]) return;
-    showToast(actionMessages[action].pending, 'info');
+    var svcName = matchServiceName(e.detail.elt) || '';
+    showOpBanner(svcName, actionMessages[action].label);
 });
 
 // Success feedback when operation completes
@@ -522,8 +580,6 @@ document.addEventListener('htmx:afterRequest', function(e) {
     if (!action || !actionMessages[action]) return;
 
     if (e.detail.successful) {
-        // SSE streams return HTTP 200 even on failure — check the response
-        // body for "event: app-error" to detect errors inside the stream.
         var responseText = e.detail.xhr.responseText || '';
         var errorIdx = responseText.indexOf('event: app-error');
         if (errorIdx !== -1) {
@@ -533,9 +589,9 @@ document.addEventListener('htmx:afterRequest', function(e) {
                 var lineEnd = responseText.indexOf('\n', dataPrefix);
                 reason = responseText.substring(dataPrefix + 6, lineEnd !== -1 ? lineEnd : undefined).trim();
             }
-            showToast(actionMessages[action].fail + (reason ? ': ' + reason : ''), 'error');
+            resolveOpBanner(false, actionMessages[action].fail + (reason ? ': ' + reason : ''));
         } else {
-            showToast(actionMessages[action].ok, 'success');
+            resolveOpBanner(true, actionMessages[action].ok);
         }
     }
 });
@@ -548,7 +604,7 @@ document.addEventListener('htmx:responseError', function(e) {
     if (status === 409) {
         showToast('!! BUSY — operation in progress', 'warning');
     } else if (action && actionMessages[action]) {
-        showToast(actionMessages[action].fail, 'error');
+        resolveOpBanner(false, actionMessages[action].fail);
     } else {
         showToast('!! ERROR: ' + status, 'error');
     }

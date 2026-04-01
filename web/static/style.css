@@ -1963,7 +1963,7 @@ article.card, .service-card {
 
 .toast-container {
     position: fixed;
-    bottom: 16px;
+    bottom: 68px;
     right: 16px;
     z-index: 10000;
     display: flex;
@@ -2775,4 +2775,101 @@ body > header, body > main, body > footer, section, .container { max-width: none
     font-weight: 500;
     color: var(--text);
     margin: 0;
+}
+
+/* ══════════════════════════════════════════
+   35. OPERATION BANNER
+   ══════════════════════════════════════════ */
+
+.op-banner {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    min-width: 260px;
+    max-width: 22rem;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text);
+    box-shadow: 0 4px 16px rgba(0,0,0,.25);
+    animation: toast-slide-in 300ms ease;
+    transition: opacity 300ms, border-color 300ms, background 300ms;
+}
+
+.op-banner-spinner {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.op-banner-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.op-banner-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.op-banner-title {
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.op-banner-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+}
+
+.op-banner-logs {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    background: var(--accent);
+    color: var(--bg);
+}
+
+.op-banner-logs:hover {
+    opacity: .85;
+}
+
+.op-banner.is-success {
+    background: var(--green-bg);
+    border-color: var(--green-bdr);
+    color: var(--green);
+}
+
+.op-banner.is-success .op-banner-desc { color: var(--green); opacity: .8; }
+
+.op-banner.is-error {
+    background: var(--red-bg);
+    border-color: var(--red-bdr);
+    color: var(--red);
+}
+
+.op-banner.is-error .op-banner-desc { color: var(--red); opacity: .8; }
+
+.op-banner-fade-out {
+    opacity: 0;
 }
