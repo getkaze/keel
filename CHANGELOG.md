@@ -9,6 +9,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5] — 2026-04-01
+
 ### Changed
 
 - **Branding** — replace old wind/purple icon with Keel cross logo; favicon adapts to light/dark system theme; tab title and navbar wordmark capitalized to "Keel" (@mateusmetzker)
@@ -191,7 +193,8 @@ Initial public release (@mateusmetzker).
 - Data directory: `/var/lib/keel` (Linux) or `~/.keel` (macOS)
 - Install script: `curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash`
 
-[Unreleased]: https://github.com/getkaze/keel/compare/v0.4...HEAD
+[Unreleased]: https://github.com/getkaze/keel/compare/v0.5...HEAD
+[0.5]: https://github.com/getkaze/keel/compare/v0.4...v0.5
 [0.4]: https://github.com/getkaze/keel/compare/v0.3...v0.4
 [0.3]: https://github.com/getkaze/keel/compare/v0.2...v0.3
 [0.2]: https://github.com/getkaze/keel/compare/v0.1.1...v0.2
