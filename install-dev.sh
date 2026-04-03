@@ -131,6 +131,48 @@ if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
   ok "ownership set to ${SUDO_USER} (self-update enabled)"
 fi
 
+# ── PATH setup ────────────────────────────────────────────────────────────────
+patch_shell_profile() {
+  local export_line="export PATH=\"${INSTALL_DIR}:\$PATH\""
+  local profile=""
+
+  local user_shell
+  user_shell="$(basename "${SHELL:-}")"
+  case "$user_shell" in
+    zsh)   profile="${REAL_HOME}/.zshrc" ;;
+    bash)
+      if [ "$OS" = "darwin" ]; then
+        profile="${REAL_HOME}/.bash_profile"
+      else
+        profile="${REAL_HOME}/.bashrc"
+      fi
+      ;;
+    fish)  profile="${REAL_HOME}/.config/fish/config.fish"
+           export_line="fish_add_path ${INSTALL_DIR}" ;;
+    *)     profile="" ;;
+  esac
+
+  if [ -z "$profile" ]; then
+    echo ""
+    echo "${bold}Note:${reset} add ${INSTALL_DIR} to your PATH manually:"
+    echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+    return
+  fi
+
+  if [ -f "$profile" ] && grep -qF "${INSTALL_DIR}" "$profile" 2>/dev/null; then
+    return
+  fi
+
+  printf '\n# Added by keel installer\n%s\n' "$export_line" >> "$profile"
+  ok "added ${INSTALL_DIR} to PATH in ${profile}"
+  echo "  Run: ${bold}source ${profile}${reset}  (or open a new terminal)"
+}
+
+case ":${PATH}:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *) patch_shell_profile ;;
+esac
+
 # ── done ──────────────────────────────────────────────────────────────────────
 VERSION="$("${INSTALL_DIR}/${BINARY_NAME}" version 2>/dev/null || echo "dev")"
 echo ""

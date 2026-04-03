@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Auto PATH setup** — installer now detects the user's shell (zsh, bash, fish) and automatically appends the install directory to the appropriate profile file (`~/.zshrc`, `~/.bash_profile`, `~/.bashrc`, or `config.fish`); falls back to a manual instruction for unsupported shells (@mateusmetzker)
+
 ### Fixed
 
 - **Metrics** — metrics page now correctly shows remote host data when target is not local; previously always displayed local machine metrics after hot-reload (@mateusmetzker)
