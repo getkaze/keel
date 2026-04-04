@@ -206,15 +206,18 @@ func (e *Executor) boot(ctx context.Context, out chan<- string, svc model.Servic
 		portBind = "127.0.0.1"
 	}
 
-	args := []string{
-		"run", "-d",
+	args := []string{"run", "-d"}
+	if svc.Platform != "" {
+		args = append(args, "--platform", svc.Platform)
+	}
+	args = append(args,
 		"--name", svc.Hostname,
 		"--hostname", svc.Hostname,
 		"--network", network,
 		"--restart", "unless-stopped",
 		"--label", "keel.managed=true",
-		"--label", "keel.service=" + svc.Name,
-	}
+		"--label", "keel.service="+svc.Name,
+	)
 
 	if svc.Ports.External > 0 && svc.Ports.Internal > 0 {
 		args = append(args, "-p", fmt.Sprintf("%s:%d:%d", portBind, svc.Ports.External, svc.Ports.Internal))

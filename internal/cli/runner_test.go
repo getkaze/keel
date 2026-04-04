@@ -95,6 +95,31 @@ func TestBuildRunArgs_SimpleCommand(t *testing.T) {
 	}
 }
 
+func TestBuildRunArgs_Platform(t *testing.T) {
+	svc := model.Service{
+		Name:     "app",
+		Hostname: "keel-app",
+		Image:    "app:latest",
+		Platform: "linux/amd64",
+	}
+	args := buildRunArgs(svc, "/opt/keel", "")
+	assertContainsPair(t, args, "--platform", "linux/amd64")
+}
+
+func TestBuildRunArgs_NoPlatform(t *testing.T) {
+	svc := model.Service{
+		Name:     "app",
+		Hostname: "keel-app",
+		Image:    "app:latest",
+	}
+	args := buildRunArgs(svc, "/opt/keel", "")
+	for _, a := range args {
+		if a == "--platform" {
+			t.Error("should not have --platform flag when not set")
+		}
+	}
+}
+
 func TestBuildRunArgs_Environment(t *testing.T) {
 	svc := model.Service{
 		Name:        "app",

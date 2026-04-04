@@ -426,13 +426,16 @@ func buildRunArgs(svc model.Service, keelDir, portBind string) []string {
 		network = "keel-net"
 	}
 
-	args := []string{
-		"run", "-d",
+	args := []string{"run", "-d"}
+	if svc.Platform != "" {
+		args = append(args, "--platform", svc.Platform)
+	}
+	args = append(args,
 		"--name", svc.Hostname,
 		"--hostname", svc.Hostname,
 		"--network", network,
 		"--restart", "unless-stopped",
-	}
+	)
 
 	if svc.Ports.External > 0 && svc.Ports.Internal > 0 {
 		args = append(args, "-p",

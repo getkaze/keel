@@ -226,6 +226,49 @@ func TestBoot_KeelLabels(t *testing.T) {
 	}
 }
 
+func TestBoot_Platform(t *testing.T) {
+	svc := model.Service{
+		Name:     "app",
+		Hostname: "keel-app",
+		Image:    "app:latest",
+		Platform: "linux/amd64",
+	}
+	mr := &mockRunner{}
+	e := &Executor{Runner: mr, KeelDir: "/tmp/keel"}
+	out := make(chan string, 64)
+	_ = e.boot(context.Background(), out, svc)
+
+	args := mr.lastArgs()
+	found := false
+	for i, a := range args {
+		if a == "--platform" && i+1 < len(args) && args[i+1] == "linux/amd64" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected --platform linux/amd64 in args: %v", args)
+	}
+}
+
+func TestBoot_NoPlatform(t *testing.T) {
+	svc := model.Service{
+		Name:     "redis",
+		Hostname: "keel-redis",
+		Image:    "redis:7",
+	}
+	mr := &mockRunner{}
+	e := &Executor{Runner: mr, KeelDir: "/tmp/keel"}
+	out := make(chan string, 64)
+	_ = e.boot(context.Background(), out, svc)
+
+	for _, a := range mr.lastArgs() {
+		if a == "--platform" {
+			t.Error("should not have --platform flag when not set")
+		}
+	}
+}
+
 func TestBoot_NoPorts(t *testing.T) {
 	svc := model.Service{
 		Name:     "redis",

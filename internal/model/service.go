@@ -25,6 +25,7 @@ type Service struct {
 	DashboardURL  string            `json:"dashboard_url,omitempty"`
 	Dev           *DevConfig        `json:"dev,omitempty"`
 	StartOrder    int               `json:"start_order,omitempty"`
+	Platform      string            `json:"platform,omitempty"`
 }
 
 // DevConfig defines how to run a service in local development mode.
