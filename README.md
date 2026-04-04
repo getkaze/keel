@@ -1,12 +1,10 @@
 <div align="center">
 
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="logo-light.svg">
-    <source media="(prefers-color-scheme: light)" srcset="logo-dark.svg">
-    <img src="logo-dark.svg" alt="Keel" width="48" height="48">
+    <source media="(prefers-color-scheme: dark)" srcset="banner-light.png">
+    <source media="(prefers-color-scheme: light)" srcset="banner-dark.png">
+    <img src="banner-dark.png" alt="Keel" width="200">
   </picture>
-
-  # Keel
 
   **One binary. Zero dependencies. Full Docker control.**
 
@@ -320,6 +318,7 @@ Each service is a JSON file in `data/services/`. Full example:
 | `volumes` | Volume mounts — named volumes, bind mounts, or config files |
 | `command` | Override container CMD |
 | `files` | Config files mounted read-only into the container; synced via `scp` on remote targets (`local:container`) |
+| `platform` | Force a specific platform for the image (e.g. `linux/amd64`) — useful for cross-architecture hosts |
 | `start_order` | Startup priority (lower = earlier, 0 = last) |
 | `ram_estimate_mb` | Display hint for the dashboard |
 | `dashboard_url` | External URL — shows an **OPEN** button in the UI |

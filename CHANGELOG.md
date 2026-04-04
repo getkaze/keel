@@ -12,10 +12,16 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - **Auto PATH setup** — installer now detects the user's shell (zsh, bash, fish) and automatically appends the install directory to the appropriate profile file (`~/.zshrc`, `~/.bash_profile`, `~/.bashrc`, or `config.fish`); falls back to a manual instruction for unsupported shells (@mateusmetzker)
+- **Platform override** — new `platform` field in service config passes `--platform` to `docker run`, allowing cross-architecture images (e.g. `linux/amd64` on ARM hosts) (@mateusmetzker)
+
+### Changed
+
+- **Branding refresh** — replace SVG logos with PNG banners and icons; remove PWA manifest and apple-mobile-web-app meta tags; navbar now uses a raster logo image (@mateusmetzker)
 
 ### Fixed
 
 - **Metrics** — metrics page now correctly shows remote host data when target is not local; previously always displayed local machine metrics after hot-reload (@mateusmetzker)
+- **Seeder interpreter** — seeder scripts now execute via `sh -c <interpreter>` instead of splitting the interpreter string on whitespace, fixing commands that contain arguments with spaces (@mateusmetzker)
 
 ## [0.5] — 2026-04-01
 
