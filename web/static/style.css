@@ -145,9 +145,8 @@ a:hover { opacity: 0.85; }
 }
 
 .topbar-logo-icon {
-    width: 20px;
-    height: 20px;
-    color: var(--accent);
+    width: 28px;
+    height: 28px;
     flex-shrink: 0;
 }
 
