@@ -264,7 +264,7 @@ func (se *SeederExecutor) runScript(ctx context.Context, hostname string, cmd mo
 	tctx, cancel := context.WithTimeout(ctx, longTimeout)
 	defer cancel()
 
-	args := append([]string{"exec", "-i", hostname}, strings.Fields(cmd.Interpreter)...)
+	args := []string{"exec", "-i", hostname, "sh", "-c", cmd.Interpreter}
 	c := se.Cmd.DockerCmd(tctx, args...)
 	c.Stdin = bytes.NewReader(scriptData)
 	var combined bytes.Buffer
