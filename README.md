@@ -48,7 +48,7 @@ That's it. Open `http://localhost:60000` and you have a full dashboard with live
 curl -fsSL https://getkaze.dev/keel/install.sh | sudo bash
 ```
 
-This installs the binary to `~/.local/bin/keel` and creates the data directory at `/var/lib/keel`. The binary is owned by your user, enabling self-update from the dashboard without sudo.
+This installs the binary to `~/.local/bin/keel` and creates the data directory at `/var/lib/keel`. The binary is owned by your user, enabling self-update from the dashboard without sudo. The installer automatically adds `~/.local/bin` to your PATH (supports zsh, bash, and fish).
 
 ---
 
@@ -180,6 +180,7 @@ Each command entry supports:
 | `command` | Single command to execute via `docker exec` |
 | `script` | Filename of a script in the seeders directory (alternative to `command`) |
 | `interpreter` | Interpreter to pipe the script into — e.g. `bash`, `python3` (used with `script`) |
+| `http` | HTTP request to execute via `curl` inside the target container (alternative to `command`/`script`) |
 
 Seeders can be run from the UI (Seeders page) or via CLI:
 
@@ -338,7 +339,7 @@ Each service is a JSON file in `data/services/`. Full example:
 |-------|-----------|
 | Backend | Go 1.24, stdlib `net/http`, `gorilla/websocket`, `creack/pty` |
 | Frontend | HTMX 2.0, Alpine.js 3.x, xterm.js |
-| Design | Kaze design system — Recursive variable font |
+| Design | Kaze design system — Inter variable font |
 | Assets | `go:embed` — single binary, ~10MB |
 | Icons | Lucide v0.469.0 (self-hosted SVG sprite) |
 | Metrics | gopsutil v4, `docker stats`, remote cache (10s) |
