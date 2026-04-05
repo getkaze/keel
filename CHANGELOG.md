@@ -11,6 +11,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Restart command** — `keel restart [service|group]` stops and starts services in one step (@mateusmetzker)
+- **Extra ports** — new `extra_ports` field in service config for mapping additional port pairs beyond the primary port (@mateusmetzker)
+- **Network aliases** — new `network_aliases` field in service config adds Docker network aliases to containers, enabling virtual hostname resolution within the Docker network (@mateusmetzker)
+- **File log volume mounts** — log sources with `type: file` and `host_path` are now automatically bind-mounted into the container at boot (@mateusmetzker)
+- **HTTP seeder commands** — seeders now support an `http` field for executing HTTP requests (via curl) inside the target container as initialization steps (@mateusmetzker)
+- **Log viewer groups** — logs sidebar now shows services grouped by their group tag, ordered by boot priority, with a search field to filter by name (@mateusmetzker)
+- **Dashboard Unknown filter** — new "Unknown" filter chip for containers with missing/unknown status (@mateusmetzker)
 - **Auto PATH setup** — installer now detects the user's shell (zsh, bash, fish) and automatically appends the install directory to the appropriate profile file (`~/.zshrc`, `~/.bash_profile`, `~/.bashrc`, or `config.fish`); falls back to a manual instruction for unsupported shells (@mateusmetzker)
 - **Platform override** — new `platform` field in service config passes `--platform` to `docker run`, allowing cross-architecture images (e.g. `linux/amd64` on ARM hosts) (@mateusmetzker)
 
@@ -20,6 +27,11 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Dashboard filter persistence** — filter selection now survives HTMX polling refreshes via sessionStorage; container count updates reactively with the active filter (@mateusmetzker)
+- **Dashboard stopped filter** — "Stopped" filter no longer shows running or unknown containers (@mateusmetzker)
+- **Seeder status** — server-rendered seeder status is now authoritative; sessionStorage only takes priority while a run is actively in progress (@mateusmetzker)
+- **Log host path expansion** — `~/` in log source host paths is now correctly expanded via `ssh.ExpandHome` (@mateusmetzker)
+- **Reset clears runtime logs** — `keel reset` now removes the `runtime/<service>/` directory (@mateusmetzker)
 - **Metrics** — metrics page now correctly shows remote host data when target is not local; previously always displayed local machine metrics after hot-reload (@mateusmetzker)
 - **Seeder interpreter** — seeder scripts now execute via `sh -c <interpreter>` instead of splitting the interpreter string on whitespace, fixing commands that contain arguments with spaces (@mateusmetzker)
 

@@ -65,6 +65,8 @@ keel start infra               # start all services in a group
 keel stop                      # stop all services
 keel stop traefik              # stop specific service
 keel stop tools                # stop all services in a group
+keel restart                   # restart all services (stop + start)
+keel restart redis mysql       # restart specific services
 keel reset --all               # destroy and recreate all containers
 keel reset redis               # recreate a single service
 
@@ -313,7 +315,8 @@ Each service is a JSON file in `data/services/`. Full example:
 | `image` | Docker image `name:tag` |
 | `registry` | `ghcr` — auto-login with stored credentials; `local` — skip pull for locally built images (omit for public images) |
 | `network` | Docker network (defaults to `keel-net`) |
-| `ports` | `{ internal, external }` port mapping |
+| `ports` | `{ internal, external }` primary port mapping |
+| `extra_ports` | Additional `{ internal, external }` port mappings |
 | `environment` | Environment variables passed to the container |
 | `volumes` | Volume mounts — named volumes, bind mounts, or config files |
 | `command` | Override container CMD |
@@ -324,6 +327,7 @@ Each service is a JSON file in `data/services/`. Full example:
 | `dashboard_url` | External URL — shows an **OPEN** button in the UI |
 | `health_check` | HTTP or command-based health check config |
 | `logs` | Log sources — `docker` or `file` with optional `host_path` |
+| `network_aliases` | Docker network aliases — enables virtual hostname resolution within the network |
 | `dev` | Development mode config — `dockerfile`, `command`, `cap_add` |
 
 ---
