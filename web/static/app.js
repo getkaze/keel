@@ -534,7 +534,19 @@ function showOpBanner(serviceName, actionLabel) {
             '<div class="op-banner-title">' + escapeHtml(serviceName) + '</div>' +
             '<div class="op-banner-desc">' + escapeHtml(actionLabel) + '</div>' +
         '</div>' +
-        '<button class="op-banner-logs" onclick="document.dispatchEvent(new Event(\'operation-start\'))">View Logs</button>';
+        '<button class="op-banner-logs" onclick="navigateToLogs(\'' + escapeHtml(serviceName).replace(/'/g, "\\'") + '\')">View Logs</button>' +
+        '<button class="op-banner-close" onclick="dismissOpBanner()" aria-label="Close">&times;</button>';
+}
+
+function dismissOpBanner() {
+    var banner = document.getElementById('op-banner');
+    if (!banner || banner.style.display === 'none') return;
+    clearTimeout(_opBannerTimer);
+    banner.classList.add('op-banner-fade-out');
+    setTimeout(function() {
+        banner.style.display = 'none';
+        banner.className = 'op-banner';
+    }, 300);
 }
 
 function resolveOpBanner(ok, message) {
@@ -593,6 +605,11 @@ document.addEventListener('htmx:afterRequest', function(e) {
         } else {
             resolveOpBanner(true, actionMessages[action].ok);
         }
+    } else if (e.detail.xhr.status === 0) {
+        // Request aborted (e.g. card polling swapped element mid-stream) — resolve as success
+        resolveOpBanner(true, actionMessages[action].ok);
+    } else {
+        resolveOpBanner(false, actionMessages[action].fail);
     }
 });
 

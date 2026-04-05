@@ -2853,6 +2853,28 @@ body > header, body > main, body > footer, section, .container { max-width: none
     opacity: .85;
 }
 
+.op-banner-close {
+    flex-shrink: 0;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.op-banner-close:hover {
+    color: var(--text);
+    background: rgba(255,255,255,.1);
+}
+
 .op-banner.is-success {
     background: var(--green-bg);
     border-color: var(--green-bdr);

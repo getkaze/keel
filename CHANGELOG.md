@@ -34,6 +34,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Reset clears runtime logs** — `keel reset` now removes the `runtime/<service>/` directory (@mateusmetzker)
 - **Metrics** — metrics page now correctly shows remote host data when target is not local; previously always displayed local machine metrics after hot-reload (@mateusmetzker)
 - **Seeder interpreter** — seeder scripts now execute via `sh -c <interpreter>` instead of splitting the interpreter string on whitespace, fixing commands that contain arguments with spaces (@mateusmetzker)
+- **Operation banner stuck** — the operation banner (loading spinner) no longer gets stuck when the card polling swap aborts the in-flight SSE request; aborted requests now resolve the banner as success (@mateusmetzker)
+- **View Logs button** — "View Logs" in the operation banner now navigates to the logs page with the service pre-selected instead of opening the operation progress panel (@mateusmetzker)
 
 ## [0.5] — 2026-04-01
 
