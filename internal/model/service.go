@@ -15,6 +15,7 @@ type Service struct {
 	Registry      string            `json:"registry,omitempty"`
 	Network       string            `json:"network"`
 	Ports         PortConfig        `json:"ports"`
+	ExtraPorts    []PortConfig      `json:"extra_ports,omitempty"`
 	Environment   map[string]string `json:"environment,omitempty"`
 	Volumes       []string          `json:"volumes,omitempty"`
 	Command       string            `json:"command,omitempty"`
@@ -24,8 +25,9 @@ type Service struct {
 	RAMEstimateMB int               `json:"ram_estimate_mb,omitempty"`
 	DashboardURL  string            `json:"dashboard_url,omitempty"`
 	Dev           *DevConfig        `json:"dev,omitempty"`
-	StartOrder    int               `json:"start_order,omitempty"`
-	Platform      string            `json:"platform,omitempty"`
+	StartOrder       int               `json:"start_order,omitempty"`
+	Platform         string            `json:"platform,omitempty"`
+	NetworkAliases   []string          `json:"network_aliases,omitempty"`
 }
 
 // DevConfig defines how to run a service in local development mode.

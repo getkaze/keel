@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -161,7 +162,12 @@ func (e *Executor) updateService(ctx context.Context, out chan<- string, name st
 		emit(out, fmt.Sprintf("[%s] local image, skipping pull", svc.Name))
 	} else {
 		emit(out, fmt.Sprintf("[%s] pulling %s", svc.Name, svc.Image))
-		if err := e.dockerStream(ctx, out, "pull", svc.Image); err != nil {
+		pullArgs := []string{"pull"}
+		if svc.Platform != "" {
+			pullArgs = append(pullArgs, "--platform", svc.Platform)
+		}
+		pullArgs = append(pullArgs, svc.Image)
+		if err := e.dockerStream(ctx, out, pullArgs...); err != nil {
 			emit(out, fmt.Sprintf("[%s] pull failed, keeping existing container: %v", svc.Name, err))
 			return fmt.Errorf("pull %s: %w", svc.Image, err)
 		}
@@ -218,9 +224,17 @@ func (e *Executor) boot(ctx context.Context, out chan<- string, svc model.Servic
 		"--label", "keel.managed=true",
 		"--label", "keel.service="+svc.Name,
 	)
+	for _, alias := range svc.NetworkAliases {
+		args = append(args, "--network-alias", alias)
+	}
 
 	if svc.Ports.External > 0 && svc.Ports.Internal > 0 {
 		args = append(args, "-p", fmt.Sprintf("%s:%d:%d", portBind, svc.Ports.External, svc.Ports.Internal))
+	}
+	for _, ep := range svc.ExtraPorts {
+		if ep.External > 0 && ep.Internal > 0 {
+			args = append(args, "-p", fmt.Sprintf("%s:%d:%d", portBind, ep.External, ep.Internal))
+		}
 	}
 
 	for k, v := range svc.Environment {
@@ -234,6 +248,20 @@ func (e *Executor) boot(ctx context.Context, out chan<- string, svc model.Servic
 		if len(parts) == 2 {
 			src := filepath.Join(e.KeelDir, parts[0])
 			args = append(args, "-v", src+":"+parts[1]+":ro")
+		}
+	}
+	for _, ls := range svc.Logs {
+		if ls.Type == "file" && ls.HostPath != "" && ls.Path != "" {
+			src := ls.HostPath
+			if strings.HasPrefix(src, "~/") {
+				if home, err := os.UserHomeDir(); err == nil {
+					src = filepath.Join(home, src[2:])
+				}
+			} else if !filepath.IsAbs(src) {
+				src = filepath.Join(e.KeelDir, src)
+			}
+			os.MkdirAll(src, 0o755)
+			args = append(args, "-v", src+":"+ls.Path)
 		}
 	}
 

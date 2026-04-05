@@ -436,10 +436,18 @@ func buildRunArgs(svc model.Service, keelDir, portBind string) []string {
 		"--network", network,
 		"--restart", "unless-stopped",
 	)
+	for _, alias := range svc.NetworkAliases {
+		args = append(args, "--network-alias", alias)
+	}
 
 	if svc.Ports.External > 0 && svc.Ports.Internal > 0 {
 		args = append(args, "-p",
 			fmt.Sprintf("%s:%d:%d", portBind, svc.Ports.External, svc.Ports.Internal))
+	}
+	for _, ep := range svc.ExtraPorts {
+		if ep.External > 0 && ep.Internal > 0 {
+			args = append(args, "-p", fmt.Sprintf("%s:%d:%d", portBind, ep.External, ep.Internal))
+		}
 	}
 
 	for k, v := range svc.Environment {
@@ -453,6 +461,20 @@ func buildRunArgs(svc model.Service, keelDir, portBind string) []string {
 		if len(parts) == 2 {
 			src := filepath.Join(keelDir, parts[0])
 			args = append(args, "-v", src+":"+parts[1]+":ro")
+		}
+	}
+	for _, ls := range svc.Logs {
+		if ls.Type == "file" && ls.HostPath != "" && ls.Path != "" {
+			src := ls.HostPath
+			if strings.HasPrefix(src, "~/") {
+				if home, err := os.UserHomeDir(); err == nil {
+					src = filepath.Join(home, src[2:])
+				}
+			} else if !filepath.IsAbs(src) {
+				src = filepath.Join(keelDir, src)
+			}
+			os.MkdirAll(src, 0o755)
+			args = append(args, "-v", src+":"+ls.Path)
 		}
 	}
 
