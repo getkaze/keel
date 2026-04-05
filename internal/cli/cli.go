@@ -29,6 +29,8 @@ func Run(args []string, keelDir, version string, _ ...[]byte) {
 		runStart(args[1:], keelDir)
 	case "stop":
 		runStop(args[1:], keelDir)
+	case "restart":
+		runRestart(args[1:], keelDir)
 	case "reset":
 		runReset(args[1:], keelDir)
 	case "dev":
@@ -227,6 +229,30 @@ func runDev(args []string, keelDir string) {
 	}
 }
 
+// --- restart ---
+
+func runRestart(args []string, keelDir string) {
+	ctx := context.Background()
+
+	target, err := config.ReadTargetConfig(keelDir)
+	exitOnErr(err)
+
+	store := config.NewServiceStore(keelDir)
+	runner := NewRunner(target, keelDir)
+
+	services, err := resolveServicesOrGroups(store, args)
+	exitOnErr(err)
+
+	fmt.Printf("target: %s (%s)\n", target.Name, target.Mode)
+	for _, svc := range services {
+		fmt.Printf("[%s] restarting\n", svc.Name)
+		_ = runner.StopOne(ctx, svc)
+		if err := runner.StartOne(ctx, svc, keelDir); err != nil {
+			fmt.Fprintf(os.Stderr, "[%s] error: %v\n", svc.Name, err)
+		}
+	}
+}
+
 // --- reset ---
 
 func runReset(args []string, keelDir string) {
@@ -268,6 +294,13 @@ func runReset(args []string, keelDir string) {
 				fmt.Printf("[%s] removing volume %s\n", svc.Name, name)
 				_ = runner.Exec(ctx, "volume", "rm", name)
 			}
+		}
+
+		// Clear runtime logs
+		runtimeDir := filepath.Join(keelDir, "runtime", svc.Name)
+		if info, err := os.Stat(runtimeDir); err == nil && info.IsDir() {
+			fmt.Printf("[%s] clearing runtime logs\n", svc.Name)
+			os.RemoveAll(runtimeDir)
 		}
 
 		// Clear seeder state for seeders targeting this service
@@ -483,6 +516,8 @@ Commands:
   start <service|group> [...]               start specific services or groups (infra, app, tools)
   stop                                      stop all services on the active target
   stop <service|group> [...]                stop specific services or groups
+  restart                                    restart all services (stop + start)
+  restart <service|group> [...]              restart specific services or groups
   reset --all                               destroy and recreate all containers
   reset <service> [service...]              destroy and recreate specific containers
   purge                                     remove all containers and delete the data directory
@@ -513,6 +548,8 @@ Examples:
   keel start redis mysql                start redis and mysql only
   keel stop app                         stop all app services
   keel stop traefik                     stop traefik
+  keel restart websocket                 restart all websocket services
+  keel restart apiproxy mchapigw        restart apiproxy and mchapigw
   keel reset --all                      recreate all containers from services/*.json
   keel reset redis                      recreate only redis
   keel dev api ~/projects/api   		run api with local code + hot reload
