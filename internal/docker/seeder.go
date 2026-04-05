@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -207,7 +208,9 @@ func (se *SeederExecutor) RunOne(ctx context.Context, out chan<- string, seeder 
 		emit(out, fmt.Sprintf("[%s] running: %s", seeder.Name, cmd.Name))
 
 		var execErr error
-		if cmd.Script != "" {
+		if cmd.HTTP != nil {
+			execErr = se.runHTTP(ctx, hostname, cmd)
+		} else if cmd.Script != "" {
 			execErr = se.runScript(ctx, hostname, cmd)
 		} else {
 			execErr = se.runInline(ctx, hostname, cmd)
@@ -230,6 +233,60 @@ func (se *SeederExecutor) HasSeeders() bool {
 		return false
 	}
 	return len(seeders) > 0
+}
+
+func (se *SeederExecutor) runHTTP(ctx context.Context, hostname string, cmd model.SeederCommand) error {
+	h := cmd.HTTP
+
+	method := h.Method
+	if method == "" {
+		method = "GET"
+	}
+	expectStatus := h.ExpectStatus
+	if expectStatus == 0 {
+		expectStatus = 200
+	}
+
+	// Build curl args executed inside the target container via docker exec.
+	curlArgs := []string{
+		"curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+		"-X", method,
+	}
+	for k, v := range h.Headers {
+		curlArgs = append(curlArgs, "-H", k+": "+v)
+	}
+	if h.Body != "" {
+		curlArgs = append(curlArgs, "-d", h.Body)
+	}
+	curlArgs = append(curlArgs, h.URL)
+
+	tctx, cancel := context.WithTimeout(ctx, longTimeout)
+	defer cancel()
+
+	execArgs := append([]string{"exec", hostname}, curlArgs...)
+	c := se.Cmd.DockerCmd(tctx, execArgs...)
+	var stdout, stderr bytes.Buffer
+	c.Stdout = &stdout
+	c.Stderr = &stderr
+
+	if err := c.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg != "" {
+			return fmt.Errorf("curl failed: %w: %s", err, msg)
+		}
+		return fmt.Errorf("curl failed: %w (is curl installed in %s?)", err, hostname)
+	}
+
+	statusStr := strings.TrimSpace(stdout.String())
+	status, err := strconv.Atoi(statusStr)
+	if err != nil {
+		return fmt.Errorf("unexpected curl output: %q", statusStr)
+	}
+
+	if status != expectStatus {
+		return fmt.Errorf("HTTP %s %s: got %d, expected %d", method, h.URL, status, expectStatus)
+	}
+	return nil
 }
 
 func (se *SeederExecutor) runInline(ctx context.Context, hostname string, cmd model.SeederCommand) error {
