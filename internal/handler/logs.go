@@ -19,6 +19,7 @@ import (
 	"github.com/getkaze/keel/internal/config"
 	"github.com/getkaze/keel/internal/docker"
 	"github.com/getkaze/keel/internal/model"
+	"github.com/getkaze/keel/internal/ssh"
 )
 
 const (
@@ -74,9 +75,9 @@ func (h *LogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if logSource.HostPath != "" {
-			target := logSource.HostPath
+			target := ssh.ExpandHome(logSource.HostPath)
 			// Allow selecting a specific file within a host directory.
-			if filePath != "" && isWithinDir(filePath, logSource.HostPath) {
+			if filePath != "" && isWithinDir(filePath, target) {
 				target = filePath
 			}
 			cmd := exec.CommandContext(ctx, "tail", "-n", strconv.Itoa(lines), "-F", target)
@@ -290,6 +291,7 @@ func listLogFiles(ctx context.Context, containerName, logPath string) []LogSourc
 
 // listHostLogFiles lists log files in a host directory path recursively.
 func listHostLogFiles(hostPath string) []LogSourceFile {
+	hostPath = ssh.ExpandHome(hostPath)
 	info, err := os.Stat(hostPath)
 	if err != nil || !info.IsDir() {
 		return nil
