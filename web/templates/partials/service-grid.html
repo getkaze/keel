@@ -6,7 +6,7 @@
     <!-- Page header -->
     <div class="page-header">
         <span class="page-title">Dashboard</span>
-        <span class="page-subtitle">{{len .Services}} containers</span>
+        <span class="page-subtitle" id="container-count">{{len .Services}} containers</span>
         <div class="page-actions">
             {{if .HasStopped}}
             <button class="btn btn-primary sm"
@@ -25,17 +25,23 @@
         </div>
     </div>
 
-    <div style="padding:20px 24px" x-data="{ filter: 'all' }" x-effect="
+    <div style="padding:20px 24px" x-data="{ filter: sessionStorage.getItem('dashFilter') || 'all' }" x-effect="
+        /* Persist filter across HTMX swaps */
+        sessionStorage.setItem('dashFilter', filter);
         /* Show/hide cards and groups based on filter */
+        var visible = 0;
         $el.querySelectorAll('.container-card').forEach(c => {
             const s = c.dataset.status;
-            const match = filter === 'all' || s === filter || (filter === 'stopped' && s !== 'running' && s !== 'unhealthy' && s !== 'restarting');
+            const match = filter === 'all' || s === filter || (filter === 'stopped' && s === 'stopped');
             c.style.display = match ? '' : 'none';
+            if (match) visible++;
         });
         $el.querySelectorAll('.service-group').forEach(g => {
             const hasVisible = g.querySelector('.container-card:not([style*=&quot;display: none&quot;])');
             g.style.display = hasVisible ? '' : 'none';
         });
+        var counter = document.getElementById('container-count');
+        if (counter) counter.textContent = visible + ' containers';
     ">
         <!-- Filter bar -->
         <div class="filter-bar">
@@ -43,6 +49,7 @@
             <button class="filter-chip" :class="filter === 'running' ? 'active' : ''" @click="filter = 'running'">Running</button>
             <button class="filter-chip" :class="filter === 'restarting' ? 'active' : ''" @click="filter = 'restarting'">Restarting</button>
             <button class="filter-chip" :class="filter === 'stopped' ? 'active' : ''" @click="filter = 'stopped'">Stopped</button>
+            <button class="filter-chip" :class="filter === 'missing' ? 'active' : ''" @click="filter = 'missing'">Unknown</button>
         </div>
 
         <!-- Service groups -->

@@ -125,8 +125,32 @@ func (d *PageDeps) logsPartial(w http.ResponseWriter, r *http.Request) {
 	}
 	servicesJSON, _ := json.Marshal(svcMap)
 
+	// Group services by their Group field (preserve boot order).
+	var groupOrder []string
+	groupMap := map[string][]model.Service{}
+	for _, svc := range services {
+		g := svc.Group
+		if g == "" {
+			g = "other"
+		}
+		if _, exists := groupMap[g]; !exists {
+			groupOrder = append(groupOrder, g)
+		}
+		groupMap[g] = append(groupMap[g], svc)
+	}
+
+	type logGroup struct {
+		Name     string
+		Services []model.Service
+	}
+	var groups []logGroup
+	for _, g := range groupOrder {
+		groups = append(groups, logGroup{Name: g, Services: groupMap[g]})
+	}
+
 	d.renderTemplate(w, "log-viewer", map[string]any{
 		"Services":     services,
+		"Groups":       groups,
 		"ServicesJSON": template.JS(servicesJSON),
 	})
 }

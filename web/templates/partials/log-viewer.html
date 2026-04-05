@@ -20,14 +20,25 @@
     <div class="logs-layout" style="flex:1;height:0">
         <!-- Log sources sidebar -->
         <div class="logs-sidebar">
-            {{range .Services}}
+            <div style="padding:8px 10px 4px">
+                <input type="text" x-model="searchQuery" placeholder="Search..."
+                       style="width:100%;margin:0;padding:4px 8px;font-size:11px">
+            </div>
+            {{range $g := .Groups}}
+            <div class="logs-sidebar-group" x-show="isGroupVisible('{{$g.Name}}')"
+                 style="padding:6px 10px 2px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)">
+                {{$g.Name}}
+            </div>
+            {{range $g.Services}}
             <div class="logs-sidebar-item"
+                 x-show="isServiceVisible('{{.Name}}')"
                  @click="selectedService = '{{.Name}}'; $nextTick(() => onServiceChange())"
                  :class="selectedService === '{{.Name}}' ? 'active' : ''">
                 <span class="dot" :class="selectedService === '{{.Name}}' ? 'dot-success' : 'dot-ghost'" style="width:5px;height:5px"></span>
                 {{.Name}}
                 <span class="log-type">stdout</span>
             </div>
+            {{end}}
             {{end}}
         </div>
 
@@ -111,6 +122,7 @@ function logViewer() {
         selectedService: '',
         selectedSource: 'container',
         selectedFile: '',
+        searchQuery: '',
         sources: [],
         files: [],
         lines: 100,
@@ -120,6 +132,22 @@ function logViewer() {
         eventSource: null,
         ansi: null,
         loading: false,
+
+        serviceGroups: { {{range $g := .Groups}}{{range $g.Services}}'{{.Name}}': '{{$g.Name}}', {{end}}{{end}} },
+
+        isServiceVisible(name) {
+            if (!this.searchQuery) return true;
+            return name.toLowerCase().includes(this.searchQuery.toLowerCase());
+        },
+
+        isGroupVisible(group) {
+            if (!this.searchQuery) return true;
+            var q = this.searchQuery.toLowerCase();
+            for (var name in this.serviceGroups) {
+                if (this.serviceGroups[name] === group && name.toLowerCase().includes(q)) return true;
+            }
+            return false;
+        },
 
         get selectedSourceType() {
             var src = this.sources.find(s => s.name === this.selectedSource);

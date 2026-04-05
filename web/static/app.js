@@ -688,10 +688,11 @@ document.addEventListener('htmx:afterSwap', function(e) {
     document.querySelectorAll('.seeder-item').forEach(function(card) {
         var name = card.id.replace('seeder-card-', '');
 
-        // Prefer live status from sessionStorage over server-rendered data-last-status
-        var liveStatus = sessionStorage.getItem('seederStatus-' + name);
+        // Server-rendered status is authoritative (picks up CLI changes).
+        // Only prefer sessionStorage while a run is actively in progress.
         var serverStatus = card.dataset.lastStatus;
-        var status = liveStatus || serverStatus;
+        var liveStatus = sessionStorage.getItem('seederStatus-' + name);
+        var status = (liveStatus === 'running') ? liveStatus : (serverStatus || liveStatus);
         if (status) setSeederStatus(name, status);
 
         var logHtml = sessionStorage.getItem('seederLog-' + name);
