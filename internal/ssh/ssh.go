@@ -25,6 +25,7 @@ func BuildArgs(t *config.TargetConfig) []string {
 	args := []string{
 		"-o", "StrictHostKeyChecking=accept-new",
 		"-o", "BatchMode=yes",
+		"-o", "IdentityAgent=none",
 		"-o", "LogLevel=ERROR",
 	}
 	if t.SSHKey != "" {
