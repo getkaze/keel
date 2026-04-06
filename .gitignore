@@ -16,9 +16,11 @@ agents/
 rules/
 schemas/
 helm.yaml
+references/
 
 # Generics
 .keel/
+keel
 scripts/
 
 # Designer source assets

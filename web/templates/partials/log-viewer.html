@@ -70,6 +70,19 @@
                     </select>
                 </template>
 
+                <div class="log-search">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" x-model.debounce.200ms="filterQuery" placeholder="Filter logs..."
+                           @input="applyFilter()">
+                    <button class="btn-case" :class="filterCaseSensitive ? 'active' : ''"
+                            @click="filterCaseSensitive = !filterCaseSensitive; applyFilter()"
+                            title="Case sensitive">Aa</button>
+                    <span x-show="filterQuery" style="font-size:10px;color:var(--muted);white-space:nowrap"
+                          x-text="filterMatchCount + '/' + lineCount"></span>
+                    <button x-show="filterQuery" class="btn-filter-clear" @click="filterQuery = ''; applyFilter()"
+                            title="Clear filter">&times;</button>
+                </div>
+
                 <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
                     <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);margin:0">
                         Lines:
@@ -123,6 +136,9 @@ function logViewer() {
         selectedSource: 'container',
         selectedFile: '',
         searchQuery: '',
+        filterQuery: '',
+        filterCaseSensitive: false,
+        filterMatchCount: 0,
         sources: [],
         files: [],
         lines: 100,
@@ -242,9 +258,24 @@ function logViewer() {
 
             this.eventSource.onmessage = (e) => {
                 var line = document.createElement('div');
+                line.setAttribute('data-log', e.data);
                 line.innerHTML = safeAnsiHtml(this.ansi, e.data);
-                output.appendChild(line);
                 this.lineCount++;
+                if (this.filterQuery) {
+                    var text = e.data;
+                    var query = this.filterQuery;
+                    if (!this.filterCaseSensitive) {
+                        text = text.toLowerCase();
+                        query = query.toLowerCase();
+                    }
+                    if (text.indexOf(query) === -1) {
+                        line.style.display = 'none';
+                    } else {
+                        this.filterMatchCount++;
+                        this._highlightLine(line, e.data);
+                    }
+                }
+                output.appendChild(line);
                 if (this.follow) {
                     output.scrollTop = output.scrollHeight;
                 }
@@ -276,6 +307,74 @@ function logViewer() {
             }
         },
 
+        applyFilter() {
+            var output = this.$refs.logOutput;
+            var children = output.children;
+            var matchCount = 0;
+            var query = this.filterQuery;
+            var cs = this.filterCaseSensitive;
+            var qLower = cs ? query : query.toLowerCase();
+
+            for (var i = 0; i < children.length; i++) {
+                var el = children[i];
+                if (el.tagName === 'TEMPLATE') continue;
+                var raw = el.getAttribute('data-log');
+                if (!raw) continue;
+
+                // Restore original content (remove highlights)
+                el.innerHTML = safeAnsiHtml(this.ansi, raw);
+
+                if (!query) {
+                    el.style.display = '';
+                    continue;
+                }
+
+                var text = cs ? raw : raw.toLowerCase();
+                if (text.indexOf(qLower) === -1) {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = '';
+                    matchCount++;
+                    this._highlightLine(el, raw);
+                }
+            }
+            this.filterMatchCount = matchCount;
+        },
+
+        _highlightLine(el, raw) {
+            var query = this.filterQuery;
+            if (!query) return;
+            var flags = this.filterCaseSensitive ? 'g' : 'gi';
+            var regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+            // Walk text nodes to insert highlights without breaking HTML tags
+            var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+            var nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+            for (var i = 0; i < nodes.length; i++) {
+                var node = nodes[i];
+                var text = node.textContent;
+                if (!regex.test(text)) continue;
+                regex.lastIndex = 0;
+                var frag = document.createDocumentFragment();
+                var lastIdx = 0;
+                var match;
+                while ((match = regex.exec(text)) !== null) {
+                    if (match.index > lastIdx) {
+                        frag.appendChild(document.createTextNode(text.slice(lastIdx, match.index)));
+                    }
+                    var mark = document.createElement('mark');
+                    mark.className = 'log-highlight';
+                    mark.textContent = match[0];
+                    frag.appendChild(mark);
+                    lastIdx = regex.lastIndex;
+                }
+                if (lastIdx < text.length) {
+                    frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+                }
+                node.parentNode.replaceChild(frag, node);
+            }
+        },
+
         clearOutput() {
             var output = this.$refs.logOutput;
             var children = Array.from(output.children);
@@ -283,6 +382,7 @@ function logViewer() {
                 if (child.tagName !== 'TEMPLATE') child.remove();
             });
             this.lineCount = 0;
+            this.filterMatchCount = 0;
         },
 
         onScroll() {

@@ -1343,6 +1343,40 @@ article.card, .service-card {
 
 .log-search input::placeholder { color: var(--muted2); }
 
+.btn-case {
+    background: none;
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted2);
+    cursor: pointer;
+    line-height: 1.4;
+    transition: all .15s;
+}
+.btn-case:hover { color: var(--text); border-color: var(--muted); }
+.btn-case.active { color: var(--accent); border-color: var(--accent); background: rgba(var(--accent-rgb, 59,130,246), .1); }
+
+.btn-filter-clear {
+    background: none;
+    border: none;
+    color: var(--muted2);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+}
+.btn-filter-clear:hover { color: var(--text); }
+
+.log-highlight {
+    background: rgba(250, 204, 21, .35);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
 .logs-output {
     flex: 1;
     overflow-y: auto;

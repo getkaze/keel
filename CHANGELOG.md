@@ -9,6 +9,15 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Log content filter** — toolbar search input filters log lines by text with match highlighting; includes case-sensitive toggle (Aa button) and match counter (@mateusmetzker)
+
+### Fixed
+
+- **SSH tunnel hang** — disable SSH identity agent (`IdentityAgent=none`) to prevent tunnel from hanging when OrbStack or other agents intercept authentication (@mateusmetzker)
+- **Navbar logo** — use higher resolution navbar banner image instead of pixelated 64x64 icon (@mateusmetzker)
+
 ## [0.6] — 2026-04-05
 
 ### Added
